@@ -6,6 +6,7 @@ import uuid
 from flask import Flask
 from threading import Thread
 import sys
+import traceback
 
 # =========================
 # Token do Discord (ENV)
@@ -43,7 +44,7 @@ keep_alive()
 intents = discord.Intents.default()
 intents.message_content = True
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 @bot.event
 async def on_ready():
@@ -60,43 +61,54 @@ async def on_disconnect():
 # =========================
 # Comando PNG/JPG → GIF
 # =========================
-@bot.command()
+@bot.command(aliases=["png2gif", "jpg2gif", "image2gif"])
 async def img2gif(ctx):
-    if not ctx.message.attachments:
-        await ctx.send("❌ Envie um arquivo PNG ou JPG junto com o comando `!img2gif`")
-        print("[WARNING] Nenhum arquivo enviado")
-        return
+    try:
+        if not ctx.message.attachments:
+            await ctx.send("❌ Envie um arquivo PNG ou JPG junto com o comando `!img2gif`")
+            print("[WARNING] Nenhum arquivo enviado")
+            return
 
-    attachment = ctx.message.attachments[0]
-    filename_lower = attachment.filename.lower()
+        attachment = ctx.message.attachments[0]
+        filename_lower = attachment.filename.lower()
 
-    if not (filename_lower.endswith(".png") or filename_lower.endswith(".jpg") or filename_lower.endswith(".jpeg")):
-        await ctx.send("❌ O arquivo precisa ser PNG ou JPG")
-        print(f"[WARNING] Arquivo inválido: {attachment.filename}")
-        return
+        if not (filename_lower.endswith(".png") or filename_lower.endswith(".jpg") or filename_lower.endswith(".jpeg")):
+            await ctx.send("❌ O arquivo precisa ser PNG ou JPG")
+            print(f"[WARNING] Arquivo inválido: {attachment.filename}")
+            return
 
-    os.makedirs("temp", exist_ok=True)
+        os.makedirs("temp", exist_ok=True)
 
-    file_id = str(uuid.uuid4())
-    ext = ".png" if filename_lower.endswith(".png") else ".jpg"
-    img_path = os.path.join("temp", f"{file_id}{ext}")
-    gif_path = os.path.join("temp", f"{file_id}.gif")
+        file_id = str(uuid.uuid4())
+        ext = ".png" if filename_lower.endswith(".png") else ".jpg"
+        img_path = os.path.join("temp", f"{file_id}{ext}")
+        gif_path = os.path.join("temp", f"{file_id}.gif")
 
-    await attachment.save(img_path)
-    print(f"[INFO] Imagem recebida: {attachment.filename} → {img_path}")
+        await attachment.save(img_path)
+        print(f"[INFO] Imagem recebida: {attachment.filename} → {img_path}")
 
-    img = Image.open(img_path)
-    img.save(gif_path, format="GIF")
-    print(f"[INFO] GIF criado: {gif_path}")
+        img = Image.open(img_path)
+        img.save(gif_path, format="GIF")
+        print(f"[INFO] GIF criado: {gif_path}")
 
-    await ctx.send(
-        "✅ GIF criado com sucesso:",
-        file=discord.File(gif_path)
-    )
+        await ctx.send(
+            "✅ GIF criado com sucesso:",
+            file=discord.File(gif_path)
+        )
 
-    os.remove(img_path)
-    os.remove(gif_path)
-    print(f"[INFO] Arquivos temporários removidos: {img_path}, {gif_path}")
+    except Exception as e:
+        await ctx.send("❌ Ocorreu um erro ao processar a imagem.")
+        print(f"[ERROR] Erro em img2gif: {e}")
+        traceback.print_exc()
+
+    finally:
+        for path in [img_path, gif_path]:
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+                    print(f"[INFO] Arquivo temporário removido: {path}")
+            except Exception as ex:
+                print(f"[WARNING] Não foi possível remover {path}: {ex}")
 
 # =========================
 # Rodar bot
@@ -106,4 +118,5 @@ try:
 except discord.LoginFailure:
     print("[ERROR] Falha no login! Verifique seu DISCORD_TOKEN.")
 except Exception as e:
-    print(f"[ERROR] Ocorreu um erro: {e}")
+    print(f"[ERROR] Ocorreu um erro crítico: {e}")
+    traceback.print_exc()
