@@ -29,8 +29,9 @@ def home():
     return "Bot online!"
 
 def run_flask():
-    print("[INFO] Keep-alive rodando na porta 8080")
-    app.run(host="0.0.0.0", port=8080)
+    port = int(os.environ.get("PORT", 8080))  # Porta do Render
+    print(f"[INFO] Keep-alive rodando na porta {port}")
+    app.run(host="0.0.0.0", port=port)
 
 def keep_alive():
     t = Thread(target=run_flask)
