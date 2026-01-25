@@ -11,11 +11,12 @@ import sys
 # Token do Discord (ENV)
 # =========================
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+
 if not DISCORD_TOKEN:
     print("[ERROR] DISCORD_TOKEN não encontrado nas variáveis de ambiente!")
     sys.exit(1)
 else:
-    print(f"[INFO] Token lido corretamente: {DISCORD_TOKEN[:5]}***")
+    print(f"[INFO] Token detectado: {DISCORD_TOKEN[:5]}***")
 
 # =========================
 # Keep Alive (Render)
@@ -35,24 +36,26 @@ def keep_alive():
     t.start()
 
 keep_alive()
-print("[INFO] Keep-alive iniciado.")
 
 # =========================
 # Bot Discord
 # =========================
 intents = discord.Intents.default()
 intents.message_content = True
+
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
     print(f"✅ Bot online como {bot.user}")
 
-# Evento de debug para ver se o bot está recebendo mensagens
 @bot.event
-async def on_message(message):
-    print(f"[DEBUG] Mensagem recebida: {message.content} de {message.author}")
-    await bot.process_commands(message)
+async def on_connect():
+    print("[INFO] Conexão estabelecida com Discord...")
+
+@bot.event
+async def on_disconnect():
+    print("[WARNING] Bot desconectado do Discord!")
 
 # =========================
 # Comando PNG/JPG → GIF
@@ -60,37 +63,40 @@ async def on_message(message):
 @bot.command()
 async def img2gif(ctx):
     if not ctx.message.attachments:
-        await ctx.send("❌ Envie um arquivo PNG ou JPG/JPEG junto com o comando `!img2gif`")
+        await ctx.send("❌ Envie um arquivo PNG ou JPG junto com o comando `!img2gif`")
+        print("[WARNING] Nenhum arquivo enviado")
         return
 
     attachment = ctx.message.attachments[0]
     filename_lower = attachment.filename.lower()
+
     if not (filename_lower.endswith(".png") or filename_lower.endswith(".jpg") or filename_lower.endswith(".jpeg")):
-        await ctx.send("❌ O arquivo precisa ser PNG ou JPG/JPEG")
+        await ctx.send("❌ O arquivo precisa ser PNG ou JPG")
+        print(f"[WARNING] Arquivo inválido: {attachment.filename}")
         return
 
     os.makedirs("temp", exist_ok=True)
 
     file_id = str(uuid.uuid4())
-    input_path = os.path.join("temp", f"{file_id}_{attachment.filename}")
+    ext = ".png" if filename_lower.endswith(".png") else ".jpg"
+    img_path = os.path.join("temp", f"{file_id}{ext}")
     gif_path = os.path.join("temp", f"{file_id}.gif")
 
-    try:
-        await attachment.save(input_path)
-        print(f"[INFO] Arquivo recebido: {attachment.filename} → {input_path}")
+    await attachment.save(img_path)
+    print(f"[INFO] Imagem recebida: {attachment.filename} → {img_path}")
 
-        img = Image.open(input_path)
-        img.save(gif_path, format="GIF")
-        print(f"[INFO] GIF criado: {gif_path}")
+    img = Image.open(img_path)
+    img.save(gif_path, format="GIF")
+    print(f"[INFO] GIF criado: {gif_path}")
 
-        await ctx.send("✅ GIF criado com sucesso:", file=discord.File(gif_path))
-    finally:
-        # Limpeza de arquivos temporários
-        if os.path.exists(input_path):
-            os.remove(input_path)
-        if os.path.exists(gif_path):
-            os.remove(gif_path)
-        print(f"[INFO] Arquivos temporários removidos: {input_path}, {gif_path}")
+    await ctx.send(
+        "✅ GIF criado com sucesso:",
+        file=discord.File(gif_path)
+    )
+
+    os.remove(img_path)
+    os.remove(gif_path)
+    print(f"[INFO] Arquivos temporários removidos: {img_path}, {gif_path}")
 
 # =========================
 # Rodar bot
