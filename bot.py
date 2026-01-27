@@ -63,7 +63,7 @@ async def on_member_join(member):
         link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
 
         embed.add_field(name="1️⃣ Entre no Grupo do Roblox", value=f"[CLIQUE AQUI PARA ENTRAR]({link_grupo})", inline=False)
-        embed.add_field(name="2️⃣ Use a Logo no Perfil", value="Baixe a imagem abaixo e coloque-a na sua foto do Discord.", inline=False)
+        embed.add_field(name="2️⃣ Use a Logo", value="Utilize a logo dentro do jogo Peroxide.", inline=False)
         
         embed.set_image(url=link_logo)
         embed.set_footer(text="A Trindade te espera no campo de batalha!")
