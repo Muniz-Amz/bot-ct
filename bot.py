@@ -35,10 +35,11 @@ def keep_alive():
 keep_alive()
 
 # =========================
-# Configuração do Bot
+# Configuração do Bot (CORRIGIDO)
 # =========================
 intents = discord.Intents.default()
-intents.message_content = True
+intents.message_content = True 
+intents.members = True         
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 # =========================
@@ -49,8 +50,31 @@ async def on_ready():
     print(f"✅ Logado como {bot.user}")
     print("👉 Digite !deploy no seu servidor para ativar os comandos /")
 
+@bot.event
+async def on_member_join(member):
+    try:
+        embed = discord.Embed(
+            title=f"Bem-vindo(a) à Celestial Trindade, {member.name}! ⚔️",
+            description="É uma honra ter você conosco! Para fazer parte oficialmente, siga os dois passos abaixo:",
+            color=discord.Color.from_rgb(255, 215, 0)
+        )
+        
+        link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
+        link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
+
+        embed.add_field(name="1️⃣ Entre no Grupo do Roblox", value=f"[CLIQUE AQUI PARA ENTRAR]({link_grupo})", inline=False)
+        embed.add_field(name="2️⃣ Use a Logo no Perfil", value="Baixe a imagem abaixo e coloque-a na sua foto do Discord.", inline=False)
+        
+        embed.set_image(url=link_logo)
+        embed.set_footer(text="A Trindade te espera no campo de batalha!")
+
+        await member.send(embed=embed)
+        print(f"✅ Convite e Logo enviados para {member.name}")
+    except discord.Forbidden:
+        print(f"❌ Privado fechado de {member.name}")
+
 # =========================
-# Comando de Sincronização
+# Comando de Sincronização (Manual)
 # =========================
 @bot.command()
 async def deploy(ctx):
@@ -121,37 +145,7 @@ async def help(interaction: Interaction):
     embed.add_field(name="/ping", value="Mostra a velocidade do bot.", inline=False)
     embed.set_footer(text="Desenvolvido com ❤️")
     await interaction.response.send_message(embed=embed)
-# =========================
-# Evento: Boas-vindas (Privado)
-# =========================
-@bot.event
-async def on_member_join(member):
-    try:
-        embed = discord.Embed(
-            title=f"Bem-vindo(a) à Celestial Trindade, {member.name}! ⚔️",
-            description="É uma honra ter você conosco! Para fazer parte oficialmente, siga os dois passos abaixo:",
-            color=discord.Color.from_rgb(255, 215, 0)
-        )
-        
-        # Link do Grupo do Roblox
-        link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
-        # Link da Imagem da Logo
-        link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
 
-        embed.add_field(name="1️⃣ Entre no Grupo do Roblox", value=f"[CLIQUE AQUI PARA ENTRAR]({link_grupo})", inline=False)
-        embed.add_field(name="2️⃣ Use a Logo no Perfil", value="Baixe a imagem abaixo e coloque-a na sua foto do Discord.", inline=False)
-        
-        embed.set_image(url=link_logo)
-        embed.set_footer(text="A Trindade te espera no campo de batalha!")
-
-        await member.send(embed=embed)
-        print(f"✅ Convite e Logo enviados para {member.name}")
-    except discord.Forbidden:
-        print(f"❌ Privado fechado de {member.name}")
-
-# =========================
-# Comando: /logo (Manual)
-# =========================
 @bot.tree.command(name="logo", description="Envia o link do grupo e a logo da Celestial Trindade")
 async def logo(interaction: discord.Interaction):
     link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
@@ -166,13 +160,6 @@ async def logo(interaction: discord.Interaction):
     embed.set_image(url=link_logo)
     
     await interaction.response.send_message(embed=embed)
-# =========================
-# Configuração do Bot
-# =========================
-intents = discord.Intents.default()
-intents.message_content = True # Permite ler o !deploy
-intents.members = True         # <--- ESSA LINHA É A QUE FALTAVA!
-bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 # =========================
 # Início
