@@ -29,7 +29,7 @@ def home():
     return "Bot online!"
 
 def run_flask():
-    port = int(os.environ.get("PORT", 8080))  # Porta do Render
+    port = int(os.environ.get("PORT", 8080))
     print(f"[INFO] Keep-alive rodando na porta {port}")
     app.run(host="0.0.0.0", port=port)
 
@@ -53,29 +53,31 @@ async def on_ready():
 
 @bot.event
 async def on_connect():
-    print("[INFO] Conexão estabelecida com Discord...")
+    print("[INFO] Conectado ao Discord")
 
 @bot.event
 async def on_disconnect():
-    print("[WARNING] Bot desconectado do Discord!")
+    print("[WARNING] Desconectado do Discord")
 
 # =========================
 # Comando PNG/JPG → GIF
 # =========================
 @bot.command(aliases=["png2gif", "jpg2gif", "image2gif"])
+@commands.cooldown(1, 15, commands.BucketType.user)  # evita rate limit
 async def img2gif(ctx):
+    img_path = None
+    gif_path = None
+
     try:
         if not ctx.message.attachments:
             await ctx.send("❌ Envie um arquivo PNG ou JPG junto com o comando `!img2gif`")
-            print("[WARNING] Nenhum arquivo enviado")
             return
 
         attachment = ctx.message.attachments[0]
         filename_lower = attachment.filename.lower()
 
-        if not (filename_lower.endswith(".png") or filename_lower.endswith(".jpg") or filename_lower.endswith(".jpeg")):
+        if not filename_lower.endswith((".png", ".jpg", ".jpeg")):
             await ctx.send("❌ O arquivo precisa ser PNG ou JPG")
-            print(f"[WARNING] Arquivo inválido: {attachment.filename}")
             return
 
         os.makedirs("temp", exist_ok=True)
@@ -86,30 +88,32 @@ async def img2gif(ctx):
         gif_path = os.path.join("temp", f"{file_id}.gif")
 
         await attachment.save(img_path)
-        print(f"[INFO] Imagem recebida: {attachment.filename} → {img_path}")
+        print(f"[INFO] Imagem salva em {img_path}")
 
         img = Image.open(img_path)
         img.save(gif_path, format="GIF")
-        print(f"[INFO] GIF criado: {gif_path}")
 
         await ctx.send(
             "✅ GIF criado com sucesso:",
             file=discord.File(gif_path)
         )
 
+    except commands.CommandOnCooldown as e:
+        await ctx.send(f"⏳ Aguarde `{int(e.retry_after)}` segundos antes de usar novamente.")
+
     except Exception as e:
         await ctx.send("❌ Ocorreu um erro ao processar a imagem.")
-        print(f"[ERROR] Erro em img2gif: {e}")
+        print(f"[ERROR] {e}")
         traceback.print_exc()
 
     finally:
-        for path in [img_path, gif_path]:
+        for path in (img_path, gif_path):
             try:
-                if os.path.exists(path):
+                if path and os.path.exists(path):
                     os.remove(path)
-                    print(f"[INFO] Arquivo temporário removido: {path}")
+                    print(f"[INFO] Arquivo removido: {path}")
             except Exception as ex:
-                print(f"[WARNING] Não foi possível remover {path}: {ex}")
+                print(f"[WARNING] Falha ao remover {path}: {ex}")
 
 # =========================
 # Rodar bot
@@ -117,7 +121,7 @@ async def img2gif(ctx):
 try:
     bot.run(DISCORD_TOKEN)
 except discord.LoginFailure:
-    print("[ERROR] Falha no login! Verifique seu DISCORD_TOKEN.")
+    print("[ERROR] Token inválido!")
 except Exception as e:
-    print(f"[ERROR] Ocorreu um erro crítico: {e}")
+    print(f"[ERROR] Erro crítico: {e}")
     traceback.print_exc()
