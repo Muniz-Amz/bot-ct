@@ -1,5 +1,5 @@
 import discord
-from discord import app_commands
+from discord import app_commands, Interaction
 from discord.ext import commands
 from PIL import Image
 import os
@@ -8,19 +8,20 @@ from flask import Flask
 from threading import Thread
 import sys
 import traceback
+import time
 
 # =========================
-# Token do Discord (ENV)
+# Token do Discord
 # =========================
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 if not DISCORD_TOKEN:
-    print("[ERROR] DISCORD_TOKEN não encontrado nas variáveis de ambiente!")
+    print("[ERROR] DISCORD_TOKEN não encontrado!")
     sys.exit(1)
 else:
     print(f"[INFO] Token detectado: {DISCORD_TOKEN[:5]}***")
 
 # =========================
-# Keep Alive (Render)
+# Keep Alive Render
 # =========================
 app = Flask(__name__)
 @app.route("/")
@@ -51,7 +52,7 @@ bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 @bot.event
 async def on_ready():
     print(f"✅ Bot online como {bot.user}")
-    await bot.tree.sync()  # Registra os slash commands
+    await bot.tree.sync()  # Registra slash commands
     print("[INFO] Slash commands sincronizados!")
 
 @bot.event
@@ -63,13 +64,31 @@ async def on_disconnect():
     print("[WARNING] Desconectado do Discord")
 
 # =========================
+# Cooldown simples
+# =========================
+user_cooldowns = {}
+
+def check_cooldown(user_id):
+    now = time.time()
+    last = user_cooldowns.get(user_id, 0)
+    if now - last < 15:
+        return int(15 - (now - last))
+    user_cooldowns[user_id] = now
+    return 0
+
+# =========================
 # Slash command /gifct
 # =========================
-@app_commands.checks.cooldown(1, 15.0, key=lambda i: i.user.id)
 @bot.tree.command(name="gifct", description="Converte PNG/JPG em GIF")
-async def gifct(interaction: discord.Interaction, file: discord.Attachment):
+async def gifct(interaction: Interaction, file: discord.Attachment):
+    cd = check_cooldown(interaction.user.id)
+    if cd > 0:
+        await interaction.response.send_message(f"⏳ Aguarde {cd}s antes de usar novamente.", ephemeral=True)
+        return
+
     img_path = None
     gif_path = None
+
     try:
         filename_lower = file.filename.lower()
         if not filename_lower.endswith((".png", ".jpg", ".jpeg")):
@@ -94,14 +113,8 @@ async def gifct(interaction: discord.Interaction, file: discord.Attachment):
             file=discord.File(gif_path)
         )
 
-    except app_commands.CommandOnCooldown as e:
-        await interaction.response.send_message(
-            f"⏳ Aguarde `{int(e.retry_after)}` segundos antes de usar novamente.",
-            ephemeral=True
-        )
-
     except Exception as e:
-        await interaction.response.send_message("❌ Ocorreu um erro ao processar a imagem.", ephemeral=True)
+        await interaction.response.send_message("❌ Erro ao processar a imagem.", ephemeral=True)
         print(f"[ERROR] {e}")
         traceback.print_exc()
 
