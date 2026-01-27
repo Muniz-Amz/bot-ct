@@ -9,169 +9,123 @@ from threading import Thread
 import sys
 import traceback
 import time
-import asyncio  # IMPORTANTE: Necessário para não travar o bot
+import asyncio
 
 # =========================
 # Configurações e Token
 # =========================
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-if not DISCORD_TOKEN:
-    print("[ERROR] DISCORD_TOKEN não encontrado nas variáveis de ambiente!")
-    # Não vamos dar sys.exit aqui para o Render não ficar reiniciando em loop,
-    # mas o bot não vai logar sem token.
-else:
-    print(f"[INFO] Token detectado: {DISCORD_TOKEN[:5]}***")
 
 # =========================
-# Keep Alive Render (Servidor Web)
+# Keep Alive Render (Flask)
 # =========================
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Bot está online e operante!"
+    return "Bot vivo!"
 
 def run_flask():
-    # O Render define a porta automaticamente na variável PORT
-    port = int(os.environ.get("PORT", 8080))
-    print(f"[INFO] Servidor web rodando na porta {port}")
-    try:
-        app.run(host="0.0.0.0", port=port)
-    except Exception as e:
-        print(f"[ERROR] Falha ao iniciar Flask: {e}")
+    # Render usa a porta 10000 por padrão em muitos casos
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
 def keep_alive():
     t = Thread(target=run_flask)
-    t.daemon = True # Garante que a thread morra se o programa principal fechar
+    t.daemon = True
     t.start()
 
-# Inicia o servidor web imediatamente
 keep_alive()
 
 # =========================
 # Configuração do Bot
 # =========================
 intents = discord.Intents.default()
-intents.message_content = True
+intents.message_content = True # Necessário para o comando !deploy
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 # =========================
-# Eventos do Bot
+# Eventos
 # =========================
 @bot.event
 async def on_ready():
-    print(f"✅ Bot logado como {bot.user}")
+    print(f"✅ Logado como {bot.user}")
+    print("⚠️ Slash commands não sincronizados automaticamente para evitar Erro 429.")
+    print("👉 Digite !deploy no seu servidor para ativar os comandos /")
+
+# =========================
+# Comando de Sincronização Manual (Evita Rate Limit)
+# =========================
+@bot.command()
+@commands.is_owner() # Só você (dono do bot) pode usar isso
+async def deploy(ctx):
+    await ctx.send("Sincronizando comandos... aguarde.")
     try:
         synced = await bot.tree.sync()
-        print(f"[INFO] {len(synced)} slash commands sincronizados!")
+        await ctx.send(f"✅ Sucesso! {len(synced)} comandos sincronizados.")
     except Exception as e:
-        print(f"[ERROR] Falha ao sincronizar comandos: {e}")
+        await ctx.send(f"❌ Erro: {e}")
 
 # =========================
-# Funções Auxiliares
+# Processamento de Imagem (Seguro)
 # =========================
-user_cooldowns = {}
-
-def check_cooldown(user_id):
-    now = time.time()
-    last = user_cooldowns.get(user_id, 0)
-    if now - last < 10:  # Reduzi um pouco para teste, pode voltar para 15
-        return int(10 - (now - last))
-    user_cooldowns[user_id] = now
-    return 0
-
-# Função que roda em outra thread para não travar o bot
 def converter_imagem_sync(input_path, output_path):
-    # O 'with' garante que o arquivo seja fechado e libere memória RAM
     with Image.open(input_path) as img:
-        # Otimização opcional: converter para RGB evita erros com PNGs transparentes em alguns casos
-        if img.mode == 'P':
-            img = img.convert('RGB')
-        img.save(output_path, format="GIF", save_all=True, duration=500, loop=0)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        img.save(output_path, format="GIF")
 
 # =========================
 # Slash Command: /gifct
 # =========================
 @bot.tree.command(name="gifct", description="Converte PNG/JPG em GIF")
 async def gifct(interaction: Interaction, file: discord.Attachment):
-    # 1. Verifica Cooldown
-    cd = check_cooldown(interaction.user.id)
-    if cd > 0:
-        await interaction.response.send_message(f"⏳ Aguarde {cd}s antes de usar novamente.", ephemeral=True)
+    # Cooldown de 10 segundos
+    now = time.time()
+    if not hasattr(bot, 'last_uses'): bot.last_uses = {}
+    last = bot.last_uses.get(interaction.user.id, 0)
+    
+    if now - last < 10:
+        await interaction.response.send_message(f"⏳ Aguarde {int(10-(now-last))}s", ephemeral=True)
+        return
+    
+    bot.last_uses[interaction.user.id] = now
+
+    if not file.filename.lower().endswith((".png", ".jpg", ".jpeg")):
+        await interaction.response.send_message("❌ Envie PNG ou JPG", ephemeral=True)
         return
 
-    # 2. Validação básica de arquivo
-    filename_lower = file.filename.lower()
-    if not filename_lower.endswith((".png", ".jpg", ".jpeg")):
-        await interaction.response.send_message("❌ O arquivo precisa ser PNG ou JPG/JPEG.", ephemeral=True)
-        return
-
-    # 3. DEFER (O Pulo do Gato)
-    # Avisa o Discord que vamos processar algo pesado. Isso evita o erro de "Interaction Failed".
     await interaction.response.defer()
 
-    img_path = None
-    gif_path = None
+    img_path = f"temp_{uuid.uuid4()}.png"
+    gif_path = f"res_{uuid.uuid4()}.gif"
 
     try:
-        # Prepara diretório temporário
-        os.makedirs("temp", exist_ok=True)
-        file_id = str(uuid.uuid4())
-        ext = ".png" if filename_lower.endswith(".png") else ".jpg"
-        
-        img_path = os.path.join("temp", f"{file_id}{ext}")
-        gif_path = os.path.join("temp", f"{file_id}.gif")
-
-        # Salva o arquivo original
         await file.save(img_path)
-        print(f"[PROCESSANDO] Imagem salva: {img_path}")
-
-        # 4. Executa a conversão SEM TRAVAR o bot
-        # asyncio.to_thread joga a função pesada para fora do loop principal
         await asyncio.to_thread(converter_imagem_sync, img_path, gif_path)
         
-        print(f"[SUCESSO] GIF criado: {gif_path}")
-
-        # Envia o resultado (usamos followup porque já demos defer)
-        await interaction.followup.send(
-            "✅ GIF criado com sucesso:",
-            file=discord.File(gif_path)
-        )
+        await interaction.followup.send(file=discord.File(gif_path))
 
     except Exception as e:
-        print(f"[ERROR] Erro no comando gifct: {e}")
-        traceback.print_exc()
-        try:
-            await interaction.followup.send(f"❌ Ocorreu um erro ao processar sua imagem: {e}")
-        except:
-            pass
-
+        print(f"Erro: {e}")
+        await interaction.followup.send("❌ Erro ao converter.")
+    
     finally:
-        # 5. Limpeza de arquivos
-        # Pequeno delay para garantir que o Discord já enviou o arquivo antes de deletar
-        await asyncio.sleep(1) 
-        for path in (img_path, gif_path):
-            try:
-                if path and os.path.exists(path):
-                    os.remove(path)
-                    print(f"[CLEANUP] Removido: {path}")
-            except Exception as ex:
-                print(f"[WARNING] Falha ao remover {path}: {ex}")
+        await asyncio.sleep(2) # Espera o envio terminar
+        for p in (img_path, gif_path):
+            if os.path.exists(p): os.remove(p)
 
 # =========================
-# Iniciar Bot
+# Início
 # =========================
 if __name__ == "__main__":
-    if DISCORD_TOKEN:
+    if not DISCORD_TOKEN:
+        print("❌ ERRO: DISCORD_TOKEN não configurado no Render!")
+    else:
         try:
             bot.run(DISCORD_TOKEN)
         except discord.errors.HTTPException as e:
             if e.status == 429:
-                print("[FATAL] Rate Limit do Discord atingido (429). O bot foi bloqueado temporariamente.")
-                # Render vai tentar reiniciar, mas vai falhar até o bloqueio passar
+                print("❌ BLOQUEIO TEMPORÁRIO (429). Desligue o bot por 20 min.")
             else:
-                print(f"[FATAL] Erro HTTP: {e}")
-        except Exception as e:
-            print(f"[FATAL] Erro ao iniciar: {e}")
-    else:
-        print("[FATAL] Não foi possível iniciar: Token ausente.")
+                print(f"❌ Erro HTTP: {e}")
