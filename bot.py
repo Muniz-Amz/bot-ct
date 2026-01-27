@@ -167,6 +167,14 @@ async def logo(interaction: discord.Interaction):
     
     await interaction.response.send_message(embed=embed)
 # =========================
+# Configuração do Bot
+# =========================
+intents = discord.Intents.default()
+intents.message_content = True # Permite ler o !deploy
+intents.members = True         # <--- ESSA LINHA É A QUE FALTAVA!
+bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+
+# =========================
 # Início
 # =========================
 if __name__ == "__main__":
