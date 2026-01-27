@@ -53,7 +53,7 @@ async def on_ready():
 # Slash Command /gif
 # =========================
 @tree.command(
-    name="gif",
+    name="gifct",
     description="Converter PNG ou JPG em GIF"
 )
 @app_commands.describe(imagem="Envie uma imagem PNG ou JPG")
