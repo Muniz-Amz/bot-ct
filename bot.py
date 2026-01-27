@@ -6,8 +6,6 @@ import os
 import uuid
 from flask import Flask
 from threading import Thread
-import sys
-import traceback
 import time
 import asyncio
 
@@ -26,7 +24,6 @@ def home():
     return "Bot vivo!"
 
 def run_flask():
-    # Render usa a porta 10000 por padrão em muitos casos
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
@@ -41,7 +38,7 @@ keep_alive()
 # Configuração do Bot
 # =========================
 intents = discord.Intents.default()
-intents.message_content = True # Necessário para o comando !deploy
+intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 # =========================
@@ -50,14 +47,12 @@ bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 @bot.event
 async def on_ready():
     print(f"✅ Logado como {bot.user}")
-    print("⚠️ Slash commands não sincronizados automaticamente para evitar Erro 429.")
     print("👉 Digite !deploy no seu servidor para ativar os comandos /")
 
 # =========================
-# Comando de Sincronização Manual (Evita Rate Limit)
+# Comando de Sincronização
 # =========================
 @bot.command()
-@commands.is_owner() # Só você (dono do bot) pode usar isso
 async def deploy(ctx):
     await ctx.send("Sincronizando comandos... aguarde.")
     try:
@@ -67,7 +62,7 @@ async def deploy(ctx):
         await ctx.send(f"❌ Erro: {e}")
 
 # =========================
-# Processamento de Imagem (Seguro)
+# Funções de Imagem
 # =========================
 def converter_imagem_sync(input_path, output_path):
     with Image.open(input_path) as img:
@@ -76,11 +71,11 @@ def converter_imagem_sync(input_path, output_path):
         img.save(output_path, format="GIF")
 
 # =========================
-# Slash Command: /gifct
+# Slash Commands (/)
 # =========================
+
 @bot.tree.command(name="gifct", description="Converte PNG/JPG em GIF")
 async def gifct(interaction: Interaction, file: discord.Attachment):
-    # Cooldown de 10 segundos
     now = time.time()
     if not hasattr(bot, 'last_uses'): bot.last_uses = {}
     last = bot.last_uses.get(interaction.user.id, 0)
@@ -96,36 +91,42 @@ async def gifct(interaction: Interaction, file: discord.Attachment):
         return
 
     await interaction.response.defer()
-
     img_path = f"temp_{uuid.uuid4()}.png"
     gif_path = f"res_{uuid.uuid4()}.gif"
 
     try:
         await file.save(img_path)
         await asyncio.to_thread(converter_imagem_sync, img_path, gif_path)
-        
         await interaction.followup.send(file=discord.File(gif_path))
-
     except Exception as e:
-        print(f"Erro: {e}")
         await interaction.followup.send("❌ Erro ao converter.")
-    
     finally:
-        await asyncio.sleep(2) # Espera o envio terminar
+        await asyncio.sleep(2)
         for p in (img_path, gif_path):
             if os.path.exists(p): os.remove(p)
+
+@bot.tree.command(name="ping", description="Verifica a latência do bot")
+async def ping(interaction: Interaction):
+    latency = round(bot.latency * 1000)
+    await interaction.response.send_message(f"🏓 **Pong!** Latência: {latency}ms")
+
+@bot.tree.command(name="help", description="Mostra como usar o bot")
+async def help(interaction: Interaction):
+    embed = discord.Embed(
+        title="🤖 Central de Ajuda - Bot de GIFs",
+        description="Eu transformo suas imagens estáticas em GIFs animados!",
+        color=discord.Color.blue()
+    )
+    embed.add_field(name="/gifct", value="Anexe uma imagem (PNG/JPG) para converter.", inline=False)
+    embed.add_field(name="/ping", value="Mostra a velocidade do bot.", inline=False)
+    embed.set_footer(text="Desenvolvido com ❤️")
+    await interaction.response.send_message(embed=embed)
 
 # =========================
 # Início
 # =========================
 if __name__ == "__main__":
     if not DISCORD_TOKEN:
-        print("❌ ERRO: DISCORD_TOKEN não configurado no Render!")
+        print("❌ ERRO: DISCORD_TOKEN não configurado!")
     else:
-        try:
-            bot.run(DISCORD_TOKEN)
-        except discord.errors.HTTPException as e:
-            if e.status == 429:
-                print("❌ BLOQUEIO TEMPORÁRIO (429). Desligue o bot por 20 min.")
-            else:
-                print(f"❌ Erro HTTP: {e}")
+        bot.run(DISCORD_TOKEN)
