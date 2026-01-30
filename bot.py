@@ -8,6 +8,7 @@ from flask import Flask
 from threading import Thread
 import time
 import asyncio
+from moviepy.editor import VideoFileClip # Certifique-se de adicionar moviepy no requirements.txt
 
 # =========================
 # Configurações e Token
@@ -35,12 +36,31 @@ def keep_alive():
 keep_alive()
 
 # =========================
-# Configuração do Bot (CORRIGIDO)
+# Configuração do Bot
 # =========================
 intents = discord.Intents.default()
 intents.message_content = True 
-intents.members = True         
+intents.members = True          
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+
+# =========================
+# Funções de Processamento (Síncronas)
+# =========================
+def converter_imagem_sync(input_path, output_path):
+    with Image.open(input_path) as img:
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        img.save(output_path, format="GIF")
+
+def extrair_audio_sync(video_path, audio_path):
+    with VideoFileClip(video_path) as video:
+        video.audio.write_audiofile(audio_path, logger=None)
+
+def converter_video_gif_sync(video_path, gif_path):
+    with VideoFileClip(video_path) as clip:
+        # Redimensiona para 320px e pega os primeiros 5s para economizar RAM no Render
+        final = clip.resize(width=320).subclip(0, 5)
+        final.write_gif(gif_path, fps=10, logger=None)
 
 # =========================
 # Eventos
@@ -58,23 +78,18 @@ async def on_member_join(member):
             description="É uma honra ter você conosco! Para fazer parte oficialmente, siga os dois passos abaixo:",
             color=discord.Color.from_rgb(255, 215, 0)
         )
-        
         link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
         link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
-
         embed.add_field(name="1️⃣ Entre no Grupo do Roblox", value=f"[CLIQUE AQUI PARA ENTRAR]({link_grupo})", inline=False)
         embed.add_field(name="2️⃣ Use a Logo", value="Utilize a logo dentro do jogo Peroxide.", inline=False)
-        
         embed.set_image(url=link_logo)
         embed.set_footer(text="A Trindade te espera no campo de batalha!")
-
         await member.send(embed=embed)
-        print(f"✅ Convite e Logo enviados para {member.name}")
     except discord.Forbidden:
         print(f"❌ Privado fechado de {member.name}")
 
 # =========================
-# Comando de Sincronização (Manual)
+# Comandos de Admin
 # =========================
 @bot.command()
 async def deploy(ctx):
@@ -86,79 +101,78 @@ async def deploy(ctx):
         await ctx.send(f"❌ Erro: {e}")
 
 # =========================
-# Funções de Imagem
-# =========================
-def converter_imagem_sync(input_path, output_path):
-    with Image.open(input_path) as img:
-        if img.mode in ("RGBA", "P"):
-            img = img.convert("RGB")
-        img.save(output_path, format="GIF")
-
-# =========================
 # Slash Commands (/)
 # =========================
 
 @bot.tree.command(name="gifct", description="Converte PNG/JPG em GIF")
 async def gifct(interaction: Interaction, file: discord.Attachment):
-    now = time.time()
-    if not hasattr(bot, 'last_uses'): bot.last_uses = {}
-    last = bot.last_uses.get(interaction.user.id, 0)
-    
-    if now - last < 10:
-        await interaction.response.send_message(f"⏳ Aguarde {int(10-(now-last))}s", ephemeral=True)
-        return
-    
-    bot.last_uses[interaction.user.id] = now
-
-    if not file.filename.lower().endswith((".png", ".jpg", ".jpeg")):
-        await interaction.response.send_message("❌ Envie PNG ou JPG", ephemeral=True)
-        return
-
     await interaction.response.defer()
-    img_path = f"temp_{uuid.uuid4()}.png"
-    gif_path = f"res_{uuid.uuid4()}.gif"
-
+    img_path, gif_path = f"t_{uuid.uuid4()}.png", f"r_{uuid.uuid4()}.gif"
     try:
         await file.save(img_path)
         await asyncio.to_thread(converter_imagem_sync, img_path, gif_path)
         await interaction.followup.send(file=discord.File(gif_path))
-    except Exception as e:
-        await interaction.followup.send("❌ Erro ao converter.")
+    except Exception:
+        await interaction.followup.send("❌ Erro ao converter imagem.")
     finally:
-        await asyncio.sleep(2)
         for p in (img_path, gif_path):
             if os.path.exists(p): os.remove(p)
 
-@bot.tree.command(name="ping", description="Verifica a latência do bot")
-async def ping(interaction: Interaction):
-    latency = round(bot.latency * 1000)
-    await interaction.response.send_message(f"🏓 **Pong!** Latência: {latency}ms")
+@bot.tree.command(name="videoaudio", description="Extrai o áudio de um vídeo (MP3)")
+async def videoaudio(interaction: Interaction, file: discord.Attachment):
+    if file.size > 10000000: # Limite 10MB
+        return await interaction.response.send_message("❌ Vídeo muito grande! Máximo 10MB.")
+    
+    await interaction.response.defer()
+    v_path, a_path = f"v_{uuid.uuid4()}.mp4", f"a_{uuid.uuid4()}.mp3"
+    try:
+        await file.save(v_path)
+        await asyncio.to_thread(extrair_audio_sync, v_path, a_path)
+        await interaction.followup.send(file=discord.File(a_path))
+    except Exception:
+        await interaction.followup.send("❌ Erro ao extrair áudio.")
+    finally:
+        for p in (v_path, a_path):
+            if os.path.exists(p): os.remove(p)
 
-@bot.tree.command(name="help", description="Mostra como usar o bot")
+@bot.tree.command(name="videogif", description="Converte vídeo em GIF (Máx 5 segundos)")
+async def videogif(interaction: Interaction, file: discord.Attachment):
+    if file.size > 10000000:
+        return await interaction.response.send_message("❌ Vídeo muito grande!")
+
+    await interaction.response.defer()
+    v_path, g_path = f"v_{uuid.uuid4()}.mp4", f"g_{uuid.uuid4()}.gif"
+    try:
+        await file.save(v_path)
+        await asyncio.to_thread(converter_video_gif_sync, v_path, g_path)
+        await interaction.followup.send(file=discord.File(g_path))
+    except Exception:
+        await interaction.followup.send("❌ Erro ao gerar GIF. O vídeo pode ser incompatível.")
+    finally:
+        for p in (v_path, g_path):
+            if os.path.exists(p): os.remove(p)
+
+@bot.tree.command(name="help", description="Mostra os comandos disponíveis")
 async def help(interaction: Interaction):
-    embed = discord.Embed(
-        title="🤖 Central de Ajuda - Bot de GIFs",
-        description="Eu transformo suas imagens estáticas em GIFs animados!",
-        color=discord.Color.blue()
-    )
-    embed.add_field(name="/gifct", value="Anexe uma imagem (PNG/JPG) para converter.", inline=False)
-    embed.add_field(name="/ping", value="Mostra a velocidade do bot.", inline=False)
-    embed.set_footer(text="Desenvolvido com ❤️")
+    embed = discord.Embed(title="🤖 Central de Ajuda", color=discord.Color.blue())
+    embed.add_field(name="/gifct", value="Imagem ➔ GIF estático", inline=True)
+    embed.add_field(name="/videogif", value="Vídeo ➔ GIF animado", inline=True)
+    embed.add_field(name="/videoaudio", value="Vídeo ➔ MP3", inline=True)
+    embed.add_field(name="/logo", value="Info da guilda", inline=True)
     await interaction.response.send_message(embed=embed)
 
+@bot.tree.command(name="ping", description="Verifica a latência")
+async def ping(interaction: Interaction):
+    await interaction.response.send_message(f"🏓 Pong! {round(bot.latency * 1000)}ms")
+
+# (Seu comando /logo permanece igual...)
 @bot.tree.command(name="logo", description="Envia o link do grupo e a logo da Celestial Trindade")
 async def logo(interaction: discord.Interaction):
     link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
     link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
-
-    embed = discord.Embed(
-        title="🛡️ Identidade e Grupo - Celestial Trindade",
-        description="Aqui estão as informações oficiais da guilda:",
-        color=discord.Color.from_rgb(255, 215, 0)
-    )
+    embed = discord.Embed(title="🛡️ Identidade - Celestial Trindade", color=discord.Color.from_rgb(255, 215, 0))
     embed.add_field(name="🔗 Grupo no Roblox", value=f"[ENTRAR NO GRUPO]({link_grupo})", inline=False)
     embed.set_image(url=link_logo)
-    
     await interaction.response.send_message(embed=embed)
 
 # =========================
