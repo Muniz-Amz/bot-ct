@@ -6,9 +6,8 @@ import os
 import uuid
 from flask import Flask
 from threading import Thread
-import time
 import asyncio
-from moviepy.editor import VideoFileClip # Certifique-se de adicionar moviepy no requirements.txt
+from moviepy.editor import VideoFileClip
 
 # =========================
 # Configurações e Token
@@ -44,7 +43,7 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 # =========================
-# Funções de Processamento (Síncronas)
+# Funções de Processamento (Otimizadas para RAM Baixa)
 # =========================
 def converter_imagem_sync(input_path, output_path):
     with Image.open(input_path) as img:
@@ -57,10 +56,15 @@ def extrair_audio_sync(video_path, audio_path):
         video.audio.write_audiofile(audio_path, logger=None)
 
 def converter_video_gif_sync(video_path, gif_path):
+    # Usamos o contexto 'with' para garantir que a memória seja liberada
     with VideoFileClip(video_path) as clip:
-        # Redimensiona para 320px e pega os primeiros 5s para economizar RAM no Render
-        final = clip.resize(width=320).subclip(0, 5)
-        final.write_gif(gif_path, fps=10, logger=None)
+        # Reduzimos para 240px (essencial para o plano free do Render)
+        # Pegamos apenas os primeiros 5 segundos
+        duracao = min(clip.duration, 5)
+        final = clip.resize(width=240).subclip(0, duracao)
+        
+        # 'colors=128' e 'fps=8' reduzem drasticamente o uso de CPU e RAM
+        final.write_gif(gif_path, fps=8, logger=None, colors=128, opt="OptimizePlus")
 
 # =========================
 # Eventos
@@ -75,15 +79,10 @@ async def on_member_join(member):
     try:
         embed = discord.Embed(
             title=f"Bem-vindo(a) à Celestial Trindade, {member.name}! ⚔️",
-            description="É uma honra ter você conosco! Para fazer parte oficialmente, siga os dois passos abaixo:",
+            description="É uma honra ter você conosco!",
             color=discord.Color.from_rgb(255, 215, 0)
         )
-        link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
-        link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
-        embed.add_field(name="1️⃣ Entre no Grupo do Roblox", value=f"[CLIQUE AQUI PARA ENTRAR]({link_grupo})", inline=False)
-        embed.add_field(name="2️⃣ Use a Logo", value="Utilize a logo dentro do jogo Peroxide.", inline=False)
-        embed.set_image(url=link_logo)
-        embed.set_footer(text="A Trindade te espera no campo de batalha!")
+        embed.set_image(url="https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter")
         await member.send(embed=embed)
     except discord.Forbidden:
         print(f"❌ Privado fechado de {member.name}")
@@ -112,7 +111,8 @@ async def gifct(interaction: Interaction, file: discord.Attachment):
         await file.save(img_path)
         await asyncio.to_thread(converter_imagem_sync, img_path, gif_path)
         await interaction.followup.send(file=discord.File(gif_path))
-    except Exception:
+    except Exception as e:
+        print(f"❌ Erro GIFCT: {e}")
         await interaction.followup.send("❌ Erro ao converter imagem.")
     finally:
         for p in (img_path, gif_path):
@@ -120,8 +120,8 @@ async def gifct(interaction: Interaction, file: discord.Attachment):
 
 @bot.tree.command(name="videoaudio", description="Extrai o áudio de um vídeo (MP3)")
 async def videoaudio(interaction: Interaction, file: discord.Attachment):
-    if file.size > 10000000: # Limite 10MB
-        return await interaction.response.send_message("❌ Vídeo muito grande! Máximo 10MB.")
+    if file.size > 8000000: # Reduzi para 8MB para segurança
+        return await interaction.response.send_message("❌ Vídeo muito grande para o servidor free! Máximo 8MB.")
     
     await interaction.response.defer()
     v_path, a_path = f"v_{uuid.uuid4()}.mp4", f"a_{uuid.uuid4()}.mp3"
@@ -129,7 +129,8 @@ async def videoaudio(interaction: Interaction, file: discord.Attachment):
         await file.save(v_path)
         await asyncio.to_thread(extrair_audio_sync, v_path, a_path)
         await interaction.followup.send(file=discord.File(a_path))
-    except Exception:
+    except Exception as e:
+        print(f"❌ Erro AUDIO: {e}")
         await interaction.followup.send("❌ Erro ao extrair áudio.")
     finally:
         for p in (v_path, a_path):
@@ -137,35 +138,28 @@ async def videoaudio(interaction: Interaction, file: discord.Attachment):
 
 @bot.tree.command(name="videogif", description="Converte vídeo em GIF (Máx 5 segundos)")
 async def videogif(interaction: Interaction, file: discord.Attachment):
-    if file.size > 10000000:
-        return await interaction.response.send_message("❌ Vídeo muito grande!")
+    if file.size > 8000000:
+        return await interaction.response.send_message("❌ Vídeo muito grande! Use arquivos menores que 8MB.")
 
     await interaction.response.defer()
     v_path, g_path = f"v_{uuid.uuid4()}.mp4", f"g_{uuid.uuid4()}.gif"
     try:
         await file.save(v_path)
+        # Processamento em thread para não travar o bot
         await asyncio.to_thread(converter_video_gif_sync, v_path, g_path)
         await interaction.followup.send(file=discord.File(g_path))
-    except Exception:
-        await interaction.followup.send("❌ Erro ao gerar GIF. O vídeo pode ser incompatível.")
+    except Exception as e:
+        # AGORA O ERRO APARECE NO LOG DO RENDER
+        print(f"❌ ERRO TÉCNICO VIDEOGIF: {e}")
+        await interaction.followup.send("❌ Erro ao gerar GIF. O vídeo pode ser pesado demais ou incompatível.")
     finally:
         for p in (v_path, g_path):
             if os.path.exists(p): os.remove(p)
-
-@bot.tree.command(name="help", description="Mostra os comandos disponíveis")
-async def help(interaction: Interaction):
-    embed = discord.Embed(title="🤖 Central de Ajuda", color=discord.Color.blue())
-    embed.add_field(name="/gifct", value="Imagem ➔ GIF estático", inline=True)
-    embed.add_field(name="/videogif", value="Vídeo ➔ GIF animado", inline=True)
-    embed.add_field(name="/videoaudio", value="Vídeo ➔ MP3", inline=True)
-    embed.add_field(name="/logo", value="Info da guilda", inline=True)
-    await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="ping", description="Verifica a latência")
 async def ping(interaction: Interaction):
     await interaction.response.send_message(f"🏓 Pong! {round(bot.latency * 1000)}ms")
 
-# (Seu comando /logo permanece igual...)
 @bot.tree.command(name="logo", description="Envia o link do grupo e a logo da Celestial Trindade")
 async def logo(interaction: discord.Interaction):
     link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
