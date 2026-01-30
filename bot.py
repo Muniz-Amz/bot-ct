@@ -43,7 +43,7 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 # =========================
-# Funções de Processamento (Otimizadas para RAM Baixa)
+# Funções de Processamento (Versão Otimizada)
 # =========================
 def converter_imagem_sync(input_path, output_path):
     with Image.open(input_path) as img:
@@ -52,19 +52,19 @@ def converter_imagem_sync(input_path, output_path):
         img.save(output_path, format="GIF")
 
 def extrair_audio_sync(video_path, audio_path):
-    with VideoFileClip(video_path) as video:
-        video.audio.write_audiofile(audio_path, logger=None)
+    # fps_source="fps" ajuda a evitar erros de leitura em vídeos baixados
+    with VideoFileClip(video_path, fps_source="fps") as video:
+        video.audio.write_audiofile(audio_path, logger=None, bitrate="128k")
 
 def converter_video_gif_sync(video_path, gif_path):
-    # Usamos o contexto 'with' para garantir que a memória seja liberada
-    with VideoFileClip(video_path) as clip:
-        # Reduzimos para 240px (essencial para o plano free do Render)
-        # Pegamos apenas os primeiros 5 segundos
+    # audio=False economiza RAM crucial no Render Free
+    with VideoFileClip(video_path, audio=False, fps_source="fps") as clip:
         duracao = min(clip.duration, 5)
-        final = clip.resize(width=240).subclip(0, duracao)
+        # Reduzimos para 200px para garantir que não ultrapasse 512MB de RAM
+        final = clip.resize(width=200).subclip(0, duracao)
         
-        # 'colors=128' e 'fps=8' reduzem drasticamente o uso de CPU e RAM
-        final.write_gif(gif_path, fps=8, logger=None, colors=128, opt="OptimizePlus")
+        # Reduzimos FPS e Cores para máxima velocidade e estabilidade
+        final.write_gif(gif_path, fps=7, logger=None, colors=64, opt="OptimizePlus")
 
 # =========================
 # Eventos
@@ -120,8 +120,8 @@ async def gifct(interaction: Interaction, file: discord.Attachment):
 
 @bot.tree.command(name="videoaudio", description="Extrai o áudio de um vídeo (MP3)")
 async def videoaudio(interaction: Interaction, file: discord.Attachment):
-    if file.size > 8000000: # Reduzi para 8MB para segurança
-        return await interaction.response.send_message("❌ Vídeo muito grande para o servidor free! Máximo 8MB.")
+    if file.size > 8000000:
+        return await interaction.response.send_message("❌ Vídeo muito grande! Máximo 8MB.")
     
     await interaction.response.defer()
     v_path, a_path = f"v_{uuid.uuid4()}.mp4", f"a_{uuid.uuid4()}.mp3"
@@ -139,17 +139,15 @@ async def videoaudio(interaction: Interaction, file: discord.Attachment):
 @bot.tree.command(name="videogif", description="Converte vídeo em GIF (Máx 5 segundos)")
 async def videogif(interaction: Interaction, file: discord.Attachment):
     if file.size > 8000000:
-        return await interaction.response.send_message("❌ Vídeo muito grande! Use arquivos menores que 8MB.")
+        return await interaction.response.send_message("❌ Vídeo muito grande!")
 
     await interaction.response.defer()
     v_path, g_path = f"v_{uuid.uuid4()}.mp4", f"g_{uuid.uuid4()}.gif"
     try:
         await file.save(v_path)
-        # Processamento em thread para não travar o bot
         await asyncio.to_thread(converter_video_gif_sync, v_path, g_path)
         await interaction.followup.send(file=discord.File(g_path))
     except Exception as e:
-        # AGORA O ERRO APARECE NO LOG DO RENDER
         print(f"❌ ERRO TÉCNICO VIDEOGIF: {e}")
         await interaction.followup.send("❌ Erro ao gerar GIF. O vídeo pode ser pesado demais ou incompatível.")
     finally:
@@ -161,7 +159,7 @@ async def ping(interaction: Interaction):
     await interaction.response.send_message(f"🏓 Pong! {round(bot.latency * 1000)}ms")
 
 @bot.tree.command(name="logo", description="Envia o link do grupo e a logo da Celestial Trindade")
-async def logo(interaction: discord.Interaction):
+async def logo(interaction: Interaction):
     link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
     link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
     embed = discord.Embed(title="🛡️ Identidade - Celestial Trindade", color=discord.Color.from_rgb(255, 215, 0))
