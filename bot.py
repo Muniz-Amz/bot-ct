@@ -46,7 +46,7 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 # =========================
-# SISTEMA DE GUERRA (LOGICA)
+# SISTEMA DE GUERRA (LOGICA ATUALIZADA)
 # =========================
 class GuerraView(discord.ui.View):
     def __init__(self, imagem_url):
@@ -54,17 +54,24 @@ class GuerraView(discord.ui.View):
         self.participantes = []
         self.imagem_url = imagem_url
 
+    # --- BOTÃO ENTRAR ---
     @discord.ui.button(label="⚔️ Participar (0/12)", style=discord.ButtonStyle.green, custom_id="btn_guerra_entrar")
     async def participar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Verifica se já está na lista
         if interaction.user in self.participantes:
             return await interaction.response.send_message("❌ Você já está na lista!", ephemeral=True)
         
+        # Verifica se está cheio
         if len(self.participantes) >= 12:
             return await interaction.response.send_message("❌ A guerra já está cheia!", ephemeral=True)
 
+        # Adiciona o usuário
         self.participantes.append(interaction.user)
+        
+        # Atualiza o texto do botão
         button.label = f"⚔️ Participar ({len(self.participantes)}/12)"
         
+        # Lógica de Sorteio (quando bater 12)
         if len(self.participantes) == 12:
             random.shuffle(self.participantes)
             time_a = self.participantes[:6]
@@ -82,14 +89,35 @@ class GuerraView(discord.ui.View):
             if self.imagem_url:
                 embed_times.set_image(url=self.imagem_url)
             
-            button.disabled = True
+            # Tranca TODOS os botões
+            for child in self.children:
+                child.disabled = True
+            
             button.label = "⛔ INSCRIÇÕES ENCERRADAS"
             button.style = discord.ButtonStyle.grey
             
             await interaction.response.edit_message(view=self)
             await interaction.channel.send(content="🚨 **ATENÇÃO GUERREIROS! TIMES DEFINIDOS!**", embed=embed_times)
         else:
+            # Se não lotou, apenas atualiza a mensagem e manda o aviso de punição no privado
             await interaction.response.edit_message(view=self)
+            await interaction.followup.send("✅ **Inscrição Confirmada!**\n⚠️ **ATENÇÃO:** Se você não aparecer no horário marcado, receberá **MUTE**. Em caso de reincidência, será aplicado **WARN**.", ephemeral=True)
+
+    # --- BOTÃO SAIR / CANCELAR ---
+    @discord.ui.button(label="✖️ Sair da Fila", style=discord.ButtonStyle.red, custom_id="btn_guerra_sair")
+    async def sair(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user not in self.participantes:
+            return await interaction.response.send_message("❌ Você não está na lista de inscrição.", ephemeral=True)
+        
+        # Remove o usuário
+        self.participantes.remove(interaction.user)
+        
+        # Atualiza o botão de contagem (o primeiro botão da lista)
+        botao_participar = self.children[0] # Pega o botão verde pelo índice
+        botao_participar.label = f"⚔️ Participar ({len(self.participantes)}/12)"
+        
+        await interaction.response.edit_message(view=self)
+        await interaction.followup.send("🗑️ Você cancelou sua inscrição.", ephemeral=True)
 
 # =========================
 # FUNÇÕES DE PROCESSAMENTO
@@ -214,15 +242,32 @@ async def logo(interaction: Interaction):
     
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="agendar_guerra", description="Inicia uma chamada para guerra com sorteio de times")
-@app_commands.describe(data="Ex: Amanhã", horario="Ex: 19:00", imagem="Link da imagem do evento")
-async def agendar_guerra(interaction: Interaction, data: str, horario: str, imagem: str):
+@bot.tree.command(name="agendar_guerra", description="Inicia uma chamada para guerra com sorteio de times e regras")
+@app_commands.describe(data="Ex: Hoje", horario="Ex: 20:00", imagem="Link da imagem (URL)", limitacoes="Regras de build/nível (Ex: Sem Bankai, Apenas Shikai)")
+async def agendar_guerra(interaction: Interaction, data: str, horario: str, imagem: str, limitacoes: str):
     embed = discord.Embed(
         title="⚔️ CONVOCAÇÃO DE GUERRA",
-        description=f"📅 **Data:** {data}\n⏰ **Horário:** {horario}\n\n*Clique no botão abaixo para entrar na fila. O sorteio de 2 times ocorrerá ao atingir 12 jogadores.*",
+        description=f"Preparem-se guerreiros! A batalha foi anunciada.\n**Precisa de 12 jogadores para sortear os times.**",
         color=discord.Color.gold()
     )
+    
+    # Detalhes do Evento
+    embed.add_field(name="📅 Data", value=data, inline=True)
+    embed.add_field(name="⏰ Horário", value=horario, inline=True)
+    
+    # Campo de Regras e Limitações
+    embed.add_field(name="📜 Regras / Limitações", value=f"```\n{limitacoes}\n```", inline=False)
+    
+    # Aviso de Punição
+    embed.add_field(
+        name="🚨 PUNIÇÃO POR AUSÊNCIA", 
+        value="**Não comparecer no horário marcado = MUTE.**\n**Reincidência = WARN.**\n*Cancele sua inscrição se não puder ir.*", 
+        inline=False
+    )
+
     embed.set_image(url=imagem)
+    embed.set_footer(text="Celestial Trindade - Sistema Automático de Guerra")
+    
     view = GuerraView(imagem_url=imagem)
     await interaction.response.send_message(embed=embed, view=view)
 
