@@ -8,6 +8,7 @@ from flask import Flask
 from threading import Thread
 import asyncio
 import logging
+import random  # Necessário para o sorteio dos times
 from moviepy.editor import VideoFileClip
 
 # =========================
@@ -27,7 +28,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "🛡️ Celestial Bot Online e Operacional!"
+    return "🛡️ Celestial Bot - Sistema de Guerra Online!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -49,9 +50,66 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 # =========================
-# Funções de Processamento (Ajuste de Nitidez)
+# SISTEMA DE GUERRA (Botões e Sorteio)
 # =========================
+class GuerraView(discord.ui.View):
+    def __init__(self, imagem_url):
+        super().__init__(timeout=None) # O botão nunca expira
+        self.participantes = []
+        self.imagem_url = imagem_url
 
+    @discord.ui.button(label="⚔️ Participar (0/12)", style=discord.ButtonStyle.green, custom_id="btn_guerra_entrar")
+    async def participar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # 1. Verifica se a pessoa já clicou
+        if interaction.user in self.participantes:
+            return await interaction.response.send_message("❌ Você já está na lista!", ephemeral=True)
+        
+        # 2. Verifica se já lotou
+        if len(self.participantes) >= 12:
+            return await interaction.response.send_message("❌ A guerra já está cheia!", ephemeral=True)
+
+        # 3. Adiciona a pessoa
+        self.participantes.append(interaction.user)
+        
+        # 4. Atualiza o texto do botão (Ex: "Participar (5/12)")
+        button.label = f"⚔️ Participar ({len(self.participantes)}/12)"
+        
+        # 5. Se completou 12 pessoas, faz o sorteio
+        if len(self.participantes) == 12:
+            random.shuffle(self.participantes) # Mistura a lista
+            time_a = self.participantes[:6]    # Pega os 6 primeiros
+            time_b = self.participantes[6:]    # Pega os 6 últimos
+            
+            # Cria o Embed com o resultado
+            embed_times = discord.Embed(title="🔥 TIMES SORTEADOS!", color=discord.Color.dark_red())
+            embed_times.description = "A guerra vai começar! Organizem-se nos canais de voz."
+            
+            # Lista Time A
+            lista_a = "\n".join([f"👤 {u.mention}" for u in time_a])
+            embed_times.add_field(name="🔵 TIME A", value=lista_a, inline=True)
+            
+            # Lista Time B
+            lista_b = "\n".join([f"👤 {u.mention}" for u in time_b])
+            embed_times.add_field(name="🔴 TIME B", value=lista_b, inline=True)
+            
+            if self.imagem_url:
+                embed_times.set_image(url=self.imagem_url)
+            
+            # Tranca o botão
+            button.disabled = True
+            button.label = "⛔ INSCRIÇÕES ENCERRADAS"
+            button.style = discord.ButtonStyle.grey
+            
+            # Atualiza a mensagem original e manda o aviso
+            await interaction.response.edit_message(view=self)
+            await interaction.channel.send(content=f"🚨 **ATENÇÃO GUERREIROS! TIMES DEFINIDOS!**", embed=embed_times)
+        else:
+            # Se ainda não deu 12, só atualiza o botão
+            await interaction.response.edit_message(view=self)
+
+# =========================
+# Funções de Processamento
+# =========================
 def converter_imagem_sync(input_path, output_path):
     with Image.open(input_path) as img:
         if img.mode in ("RGBA", "P"):
@@ -63,105 +121,69 @@ def extrair_audio_sync(video_path, audio_path):
         video.audio.write_audiofile(audio_path, logger=None, bitrate="64k")
 
 def converter_video_gif_sync(video_path, gif_path):
-    # UPGRADE: Aumentamos para 300px e 10 FPS para melhorar a qualidade visual
     with VideoFileClip(video_path, audio=False, target_resolution=(300, None), fps_source="fps") as clip:
         duracao = min(clip.duration, 5)
         final = clip.subclip(0, duracao)
-        
-        # colors=128 e OptimizePlus garantem um equilíbrio entre nitidez e memória
-        final.write_gif(
-            gif_path, 
-            fps=10, 
-            logger=None, 
-            colors=128, 
-            opt="OptimizePlus"
-        )
+        final.write_gif(gif_path, fps=10, logger=None, colors=128, opt="OptimizePlus")
 
 # =========================
-# Eventos Principais
+# Eventos
 # =========================
-
 @bot.event
 async def on_ready():
     print(f"✅ Bot logado como {bot.user}")
-    print("👉 Digite !deploy no chat para ativar os comandos /")
+    print("👉 Use !deploy para atualizar.")
 
 @bot.event
 async def on_member_join(member):
     try:
-        embed = discord.Embed(
-            title=f"⚔️ Bem-vindo(a), {member.name}!",
-            description="Você entrou na **Celestial Trindade**!",
-            color=discord.Color.gold()
-        )
-        link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
-        embed.add_field(name="🛡️ Grupo Roblox", value=f"[Clique aqui para entrar]({link_grupo})")
+        embed = discord.Embed(title=f"⚔️ Bem-vindo(a), {member.name}!", color=discord.Color.gold())
+        embed.description = "Entre no grupo do Roblox para participar das guerras!"
+        embed.add_field(name="🔗 Grupo", value="[Clique Aqui](https://www.roblox.com/pt/communities/34214394/Celestial-Trindade)")
         embed.set_thumbnail(url=member.display_avatar.url)
         await member.send(embed=embed)
-    except discord.Forbidden:
-        print(f"❌ Não pude enviar DM para {member.name}")
+    except:
+        pass
 
 # =========================
-# Comando de Sincronização
+# Comandos
 # =========================
-
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def deploy(ctx):
-    await ctx.send("📡 Sincronizando comandos Slash...")
-    try:
-        synced = await bot.tree.sync()
-        await ctx.send(f"✅ Sucesso! {len(synced)} comandos sincronizados.")
-    except Exception as e:
-        await ctx.send(f"❌ Erro: {e}")
+    await bot.tree.sync()
+    await ctx.send("✅ Comandos sincronizados!")
 
-# =========================
-# Slash Commands (/)
-# =========================
+@bot.tree.command(name="agendar_guerra", description="Agenda guerra e sorteia 2 times quando atingir 12 pessoas")
+@app_commands.describe(data="Dia (ex: Hoje)", horario="Hora (ex: 20h)", imagem="Link da imagem (URL)")
+async def agendar_guerra(interaction: Interaction, data: str, horario: str, imagem: str):
+    embed = discord.Embed(
+        title="⚔️ CONVOCAÇÃO DE GUERRA",
+        description=f"**Data:** {data}\n**Horário:** {horario}\n\nClique abaixo para entrar na fila.\n**Precisa de 12 jogadores para sortear os times.**",
+        color=discord.Color.gold()
+    )
+    embed.set_image(url=imagem)
+    
+    view = GuerraView(imagem_url=imagem)
+    await interaction.response.send_message(embed=embed, view=view)
 
-@bot.tree.command(name="help", description="Lista todos os comandos")
-async def help_cmd(interaction: Interaction):
-    embed = discord.Embed(title="🤖 Ajuda Celestial", color=discord.Color.blue())
-    embed.add_field(name="/videogif", value="Vídeo para GIF (Qualidade Melhorada)", inline=False)
-    embed.add_field(name="/videoaudio", value="Extrai áudio MP3", inline=False)
-    embed.add_field(name="/gifct", value="Imagem para GIF", inline=False)
-    embed.add_field(name="/logo", value="Info da Guilda", inline=False)
-    embed.add_field(name="/ping", value="Latência do Bot", inline=False)
-    await interaction.response.send_message(embed=embed)
-
-@bot.tree.command(name="ping", description="Verifica a latência")
-async def ping(interaction: Interaction):
-    await interaction.response.send_message(f"🏓 Pong! {round(bot.latency * 1000)}ms")
-
-@bot.tree.command(name="logo", description="Logo da Celestial Trindade")
-async def logo(interaction: Interaction):
-    link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
-    link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
-    embed = discord.Embed(title="🛡️ Celestial Trindade", color=discord.Color.gold())
-    embed.set_image(url=link_logo)
-    embed.add_field(name="Grupo", value=f"[Roblox]({link_grupo})")
-    await interaction.response.send_message(embed=embed)
-
-@bot.tree.command(name="videogif", description="Converte vídeo para GIF (Nitidez Melhorada)")
+# --- Comandos de Mídia ---
+@bot.tree.command(name="videogif")
 async def videogif(interaction: Interaction, arquivo: discord.Attachment):
-    if not arquivo.content_type or not arquivo.content_type.startswith("video"):
-        return await interaction.response.send_message("❌ Envie um vídeo!")
-
+    if not arquivo.content_type.startswith("video"): return await interaction.response.send_message("❌ Envie um vídeo!")
     await interaction.response.defer()
     v_path, g_path = f"v_{uuid.uuid4()}.mp4", f"g_{uuid.uuid4()}.gif"
-    
     try:
         await arquivo.save(v_path)
         await asyncio.to_thread(converter_video_gif_sync, v_path, g_path)
         await interaction.followup.send(file=discord.File(g_path))
     except Exception as e:
-        logging.error(f"ERRO: {e}")
-        await interaction.followup.send("❌ Erro. O vídeo pode ser pesado demais para os 512MB do servidor.")
+        await interaction.followup.send("❌ Erro ao converter.")
     finally:
         for p in (v_path, g_path):
             if os.path.exists(p): os.remove(p)
 
-@bot.tree.command(name="videoaudio", description="Converte vídeo em MP3")
+@bot.tree.command(name="videoaudio")
 async def videoaudio(interaction: Interaction, arquivo: discord.Attachment):
     await interaction.response.defer()
     v_path, a_path = f"v_{uuid.uuid4()}.mp4", f"a_{uuid.uuid4()}.mp3"
@@ -169,13 +191,13 @@ async def videoaudio(interaction: Interaction, arquivo: discord.Attachment):
         await arquivo.save(v_path)
         await asyncio.to_thread(extrair_audio_sync, v_path, a_path)
         await interaction.followup.send(file=discord.File(a_path))
-    except Exception as e:
-        await interaction.followup.send("❌ Falha ao extrair áudio.")
+    except:
+        await interaction.followup.send("❌ Erro.")
     finally:
         for p in (v_path, a_path):
             if os.path.exists(p): os.remove(p)
 
-@bot.tree.command(name="gifct", description="Imagem em GIF")
+@bot.tree.command(name="gifct")
 async def gifct(interaction: Interaction, arquivo: discord.Attachment):
     await interaction.response.defer()
     i_path, o_path = f"i_{uuid.uuid4()}.png", f"o_{uuid.uuid4()}.gif"
@@ -183,11 +205,21 @@ async def gifct(interaction: Interaction, arquivo: discord.Attachment):
         await arquivo.save(i_path)
         await asyncio.to_thread(converter_imagem_sync, i_path, o_path)
         await interaction.followup.send(file=discord.File(o_path))
-    except Exception as e:
-        await interaction.followup.send("❌ Erro na imagem.")
+    except:
+        await interaction.followup.send("❌ Erro.")
     finally:
         for p in (i_path, o_path):
             if os.path.exists(p): os.remove(p)
+
+@bot.tree.command(name="ping")
+async def ping(interaction: Interaction):
+    await interaction.response.send_message(f"🏓 Pong! {round(bot.latency * 1000)}ms")
+
+@bot.tree.command(name="logo")
+async def logo(interaction: Interaction):
+    embed = discord.Embed(title="🛡️ Celestial Trindade", color=discord.Color.gold())
+    embed.set_image(url="https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter")
+    await interaction.response.send_message(embed=embed)
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
