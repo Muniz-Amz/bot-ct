@@ -130,6 +130,13 @@ async def on_member_join(member):
         link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
         link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
 
+        # Instrução do comando /solicitar
+        embed.add_field(
+            name="📝 Como entrar no Grupo", 
+            value="1. Entre no link do grupo abaixo e peça para entrar.\n2. Volte aqui no servidor e digite o comando `/solicitar`.", 
+            inline=False
+        )
+        
         embed.add_field(name="🛡️ Grupo no Roblox", value=f"[ENTRAR NO GRUPO]({link_grupo})", inline=False)
         embed.add_field(name="📢 Aviso", value="Certifique-se de estar no grupo para participar dos eventos e ganhar cargos!", inline=False)
         
@@ -166,7 +173,7 @@ async def help_cmd(interaction: discord.Interaction):
     
     embed.add_field(
         name="⚔️ EVENTOS E GUILDA", 
-        value="`/agendar_guerra` - Cria um painel de inscrição para 12 pessoas.\n`/logo` - Informações e link oficial do grupo.", 
+        value="`/agendar_guerra` - Cria um painel de inscrição para 12 pessoas.\n`/logo` - Informações e link oficial do grupo.\n`/regras` - Exibe as leis do servidor.\n`/solicitar` - Pede aprovação no grupo do Roblox.", 
         inline=False
     )
     
@@ -265,6 +272,7 @@ async def gifct(interaction: Interaction, arquivo: discord.Attachment):
     finally:
         for p in (i_path, o_path):
             if os.path.exists(p): os.remove(p)
+
 @bot.tree.command(name="regras", description="Exibe as leis fundamentais da Celestial Trindade (Servidor e Jogo)")
 async def regras(interaction: discord.Interaction):
     link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
@@ -303,5 +311,41 @@ async def regras(interaction: discord.Interaction):
 
     # Enviando tudo de uma vez
     await interaction.response.send_message(embeds=[embed1, embed2, embed3])
+
+@bot.tree.command(name="solicitar", description="Envia uma solicitação para a liderança aceitar seu pedido no grupo do Roblox")
+@app_commands.describe(nick_roblox="Seu nome de usuário (Username) no Roblox")
+async def solicitar(interaction: discord.Interaction, nick_roblox: str):
+    # IDs dos cargos fornecidos
+    cargos_id = [
+        1395092778614132777,
+        1458811065583403323,
+        1425983765053837402,
+        1467634329214652486
+    ]
+    
+    # Criando a string de menção para todos os cargos
+    mencoes = " ".join([f"<@&{id_cargo}>" for id_cargo in cargos_id])
+    
+    link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
+    
+    embed = discord.Embed(
+        title="📝 Nova Solicitação de Entrada",
+        description=f"O membro {interaction.user.mention} solicitou aprovação no grupo do Roblox.",
+        color=discord.Color.blue()
+    )
+    
+    embed.add_field(name="👤 Nick no Roblox", value=f"`{nick_roblox}`", inline=True)
+    embed.add_field(name="🔗 Perfil", value=f"[Abrir Perfil](https://www.roblox.com/users/profile?username={nick_roblox})", inline=True)
+    embed.add_field(name="🛡️ Grupo", value=f"[Verificar Pedidos]({link_grupo})", inline=False)
+    
+    embed.set_thumbnail(url=interaction.user.display_avatar.url)
+    embed.set_footer(text="Celestial Trindade - Sistema de Recrutamento")
+
+    # Envia a mensagem marcando todos os cargos de ADM/Liderança
+    await interaction.response.send_message(
+        content=f"🔔 {mencoes}, novo guerreiro aguardando aprovação!", 
+        embed=embed
+    )
+
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
