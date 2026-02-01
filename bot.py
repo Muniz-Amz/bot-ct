@@ -265,6 +265,43 @@ async def gifct(interaction: Interaction, arquivo: discord.Attachment):
     finally:
         for p in (i_path, o_path):
             if os.path.exists(p): os.remove(p)
+@bot.tree.command(name="regras", description="Exibe as leis fundamentais da Celestial Trindade (Servidor e Jogo)")
+async def regras(interaction: discord.Interaction):
+    link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
+    
+    # --- EMBED 1: REGRAS DO SERVIDOR ---
+    embed1 = discord.Embed(
+        title="📜 Regras do Servidor - Celestial Trindade",
+        description="O descumprimento destas normas resultará em punições imediatas.",
+        color=discord.Color.gold()
+    )
+    embed1.add_field(name="⚖️ Conduta Básica", value="**1.** Respeito mútuo acima de tudo.\n**2.** Proibido qualquer tipo de Discriminação/Racismo/Homofobia.\n**3.** Proibido Spam de mensagens repetitivas.", inline=False)
+    embed1.add_field(name="🚫 Proibições", value="**4.** Conteúdo +18 (Pornografia/Gifs) é proibido.\n**5.** Proibido divulgar outros servidores/canais sem permissão.\n**6.** Proibido vazar informações internas da guilda.\n**7.** Proibido mendigar cargo ou promoções.", inline=False)
+    embed1.add_field(name="👥 Outros", value="**8.** Evite intrigas por religião ou política.\n**9.** Idade mínima: 13 anos.", inline=False)
+    embed1.set_thumbnail(url=link_logo)
 
+    # --- EMBED 2: REGRAS DO JOGO (PEROXIDE) ---
+    embed2 = discord.Embed(
+        title="⚔️ Regras do Jogo - Peroxide",
+        description="Normas de combate e comportamento in-game.",
+        color=discord.Color.dark_red()
+    )
+    embed2.add_field(name="🛡️ Identidade", value="**1.** É obrigatório o uso da Logo da Guilda.\n**2.** Proibido lutar contra membros da guilda sem logo.", inline=False)
+    embed2.add_field(name="🚫 Combate e Traição", value="**3.** Proibido Grips/Mortes não justificadas contra membros ou Allys.\n**4.** Proibido deixar aliados morrerem na sua presença.\n**5.** Proibido usar o nome da guilda para causar má reputação.", inline=False)
+    embed2.add_field(name="⚠️ Observação", value="A guilda não protege membros que ajudam jogadores sem logo ou de guildas inimigas.", inline=False)
+
+    # --- EMBED 3: SISTEMA DE WARNS ---
+    embed3 = discord.Embed(
+        title="⚠️ Sistema de Punições (WARNs)",
+        description="A contagem de infrações leva à expulsão definitiva.",
+        color=discord.Color.red()
+    )
+    embed3.add_field(name="Fase Inicial", value="`1-2 WARNs`: Advertência verbal e aviso público.", inline=True)
+    embed3.add_field(name="Fase Grave", value="`3-4 WARNs`: Suspensão de eventos e rebaixamento.", inline=True)
+    embed3.add_field(name="Fase Final", value="`5-6 WARNs`: Última chance e avaliação da liderança.\n`7 WARNs`: **EXPULSÃO IMEDIATA.**", inline=False)
+    embed3.set_footer(text="A liderança reserva o direito de punir atos maliciosos não listados.")
+
+    # Enviando tudo de uma vez
+    await interaction.response.send_message(embeds=[embed1, embed2, embed3])
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
