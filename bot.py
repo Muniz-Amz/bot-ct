@@ -137,13 +137,34 @@ async def on_ready():
 @bot.event
 async def on_member_join(member):
     try:
-        embed = discord.Embed(title=f"⚔️ Bem-vindo(a), {member.name}!", color=discord.Color.gold())
-        embed.description = "Entre no grupo do Roblox para participar das guerras!"
-        embed.add_field(name="🔗 Grupo", value="[Clique Aqui](https://www.roblox.com/pt/communities/34214394/Celestial-Trindade)")
+        # Criando o convite de boas-vindas
+        embed = discord.Embed(
+            title=f"⚔️ Bem-vindo(a) à Celestial Trindade, {member.name}!",
+            description="É uma honra ter você conosco! Prepare-se para as batalhas e fortaleça nossa guilda.",
+            color=discord.Color.gold()
+        )
+        
+        link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
+        link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
+
+        # Informações importantes no Embed
+        embed.add_field(name="🛡️ Grupo no Roblox", value=f"[ENTRAR NO GRUPO]({link_grupo})", inline=False)
+        embed.add_field(name="📢 Aviso", value="Certifique-se de estar no grupo para participar dos eventos e ganhar cargos!", inline=False)
+        
+        # Estética: Foto do membro e Logo da guilda
         embed.set_thumbnail(url=member.display_avatar.url)
+        embed.set_image(url=link_logo)
+        embed.set_footer(text="Celestial Trindade - A serviço da honra.")
+
+        # Enviando no privado do usuário
         await member.send(embed=embed)
-    except:
-        pass
+        print(f"✅ Mensagem de boas-vindas enviada para {member.name}")
+
+    except discord.Forbidden:
+        # Caso o usuário tenha a DM fechada, o bot não crasha
+        print(f"❌ Não pude enviar DM para {member.name} (DM fechada).")
+    except Exception as e:
+        print(f"❌ Erro no on_member_join: {e}")
 
 # =========================
 # Comandos
@@ -215,11 +236,74 @@ async def gifct(interaction: Interaction, arquivo: discord.Attachment):
 async def ping(interaction: Interaction):
     await interaction.response.send_message(f"🏓 Pong! {round(bot.latency * 1000)}ms")
 
-@bot.tree.command(name="logo")
+@bot.tree.command(name="logo", description="Envia a logo oficial e o link da Celestial Trindade")
 async def logo(interaction: Interaction):
-    embed = discord.Embed(title="🛡️ Celestial Trindade", color=discord.Color.gold())
-    embed.set_image(url="https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter")
+    link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
+    link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
+    
+    embed = discord.Embed(
+        title="🛡️ Celestial Trindade - Oficial",
+        description="Unidos pela força, guiados pela honra. Faça parte da nossa história no Roblox!",
+        color=discord.Color.gold()
+    )
+    
+    # Adicionando campos organizados
+    embed.add_field(name="🔗 Link do Grupo", value=f"[CLIQUE AQUI PARA ENTRAR]({link_grupo})", inline=False)
+    embed.add_field(name="⚔️ Status", value="Recrutamento Aberto", inline=True)
+    embed.add_field(name="📜 Requisito", value="Usar a logo no Peroxide", inline=True)
+    
+    # Imagem grande da logo
+    embed.set_image(url=link_logo)
+    
+    # Rodapé com ícone do usuário que pediu
+    embed.set_footer(text=f"Solicitado por {interaction.user.name}", icon_url=interaction.user.display_avatar.url)
+    
     await interaction.response.send_message(embed=embed)
+@bot.tree.command(name="help", description="Mostra a lista completa de comandos e como usá-los")
+async def help_cmd(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📚 Central de Ajuda - Celestial Bot",
+        description="Aqui estão todos os comandos disponíveis para os membros da guilda:",
+        color=discord.Color.blue()
+    )
+    
+    # Seção de Eventos e Guilda
+    embed.add_field(
+        name="⚔️ EVENTOS E GUILDA", 
+        value=(
+            "`/agendar_guerra` - Cria um painel de inscrição para 12 pessoas com sorteio.\n"
+            "`/perfil` - Consulta o perfil, ID e avatar de um jogador no Roblox.\n"
+            "`/logo` - Mostra a logo oficial e o link do nosso grupo no Roblox."
+        ), 
+        inline=False
+    )
+    
+    # Seção de Mídia
+    embed.add_field(
+        name="🎬 FERRAMENTAS DE MÍDIA", 
+        value=(
+            "`/videogif` - Transforma um vídeo enviado em um GIF de alta qualidade.\n"
+            "`/videoaudio` - Extrai apenas o som (MP3) de um vídeo.\n"
+            "`/gifct` - Converte uma imagem estática para o formato GIF."
+        ), 
+        inline=False
+    )
+    
+    # Seção de Sistema
+    embed.add_field(
+        name="🔧 SISTEMA", 
+        value=(
+            "`/ping` - Mostra a latência atual do bot.\n"
+            "`!deploy` - (Admin) Sincroniza e atualiza os comandos do bot."
+        ), 
+        inline=False
+    )
+    
+    embed.set_footer(
+        text="🛡️ Celestial Trindade - Unidos pela força, guiados pela honra.",
+        icon_url="https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
+    )
 
+    await interaction.response.send_message(embed=embed)
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
