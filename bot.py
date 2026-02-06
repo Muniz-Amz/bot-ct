@@ -9,8 +9,8 @@ from threading import Thread
 import asyncio
 import logging
 import random
+import time
 from moviepy.editor import VideoFileClip
-import moviepy.config as conf
 
 # =========================
 # CONFIGURAÇÕES DE LOG E TOKEN
@@ -36,8 +36,6 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-keep_alive()
-
 # =========================
 # CONFIGURAÇÃO DO BOT
 # =========================
@@ -47,7 +45,7 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 # =========================
-# SISTEMA DE GUERRA (LOGICA ATUALIZADA)
+# SISTEMA DE GUERRA (LOGICA COMPLETA)
 # =========================
 class GuerraView(discord.ui.View):
     def __init__(self, imagem_url):
@@ -58,18 +56,13 @@ class GuerraView(discord.ui.View):
     # --- BOTÃO ENTRAR ---
     @discord.ui.button(label="⚔️ Participar (0/12)", style=discord.ButtonStyle.green, custom_id="btn_guerra_entrar")
     async def participar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Verifica se já está na lista
         if interaction.user in self.participantes:
             return await interaction.response.send_message("❌ Você já está na lista!", ephemeral=True)
         
-        # Verifica se está cheio
         if len(self.participantes) >= 12:
             return await interaction.response.send_message("❌ A guerra já está cheia!", ephemeral=True)
 
-        # Adiciona o usuário
         self.participantes.append(interaction.user)
-        
-        # Atualiza o texto do botão
         button.label = f"⚔️ Participar ({len(self.participantes)}/12)"
         
         # Lógica de Sorteio (quando bater 12)
@@ -100,7 +93,6 @@ class GuerraView(discord.ui.View):
             await interaction.response.edit_message(view=self)
             await interaction.channel.send(content="🚨 **ATENÇÃO GUERREIROS! TIMES DEFINIDOS!**", embed=embed_times)
         else:
-            # Se não lotou, apenas atualiza a mensagem e manda o aviso de punição no privado
             await interaction.response.edit_message(view=self)
             await interaction.followup.send("✅ **Inscrição Confirmada!**\n⚠️ **ATENÇÃO:** Se você não aparecer no horário marcado, receberá **MUTE**. Em caso de reincidência, será aplicado **WARN**.", ephemeral=True)
 
@@ -110,11 +102,10 @@ class GuerraView(discord.ui.View):
         if interaction.user not in self.participantes:
             return await interaction.response.send_message("❌ Você não está na lista de inscrição.", ephemeral=True)
         
-        # Remove o usuário
         self.participantes.remove(interaction.user)
         
         # Atualiza o botão de contagem (o primeiro botão da lista)
-        botao_participar = self.children[0] # Pega o botão verde pelo índice
+        botao_participar = self.children[0] 
         botao_participar.label = f"⚔️ Participar ({len(self.participantes)}/12)"
         
         await interaction.response.edit_message(view=self)
@@ -174,10 +165,8 @@ async def on_member_join(member):
         embed.set_footer(text="Celestial Trindade - A serviço da honra.")
 
         await member.send(embed=embed)
-    except discord.Forbidden:
-        print(f"❌ DM fechada para {member.name}.")
     except Exception as e:
-        print(f"❌ Erro no on_member_join: {e}")
+        print(f"❌ Erro no on_member_join ou DM fechada: {e}")
 
 # =========================
 # COMANDOS ADMINISTRATIVOS
@@ -202,7 +191,7 @@ async def help_cmd(interaction: discord.Interaction):
     
     embed.add_field(
         name="⚔️ EVENTOS E GUILDA", 
-        value="`/agendar_guerra` - Cria um painel de inscrição para 12 pessoas.\n`/logo` - Informações e link oficial do grupo.\n`/regras` - Exibe as leis do servidor.\n`/solicitar` - Pede aprovação no grupo do Roblox.", 
+        value="`/agendar_guerra` - Cria um painel de inscrição (ADM).\n`/logo` - Informações e link oficial do grupo.\n`/regras` - Exibe as leis do servidor.\n`/solicitar` - Pede aprovação no grupo do Roblox.", 
         inline=False
     )
     
@@ -243,8 +232,9 @@ async def logo(interaction: Interaction):
     
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="agendar_guerra", description="Inicia uma chamada para guerra com sorteio de times e regras")
-@app_commands.describe(data="Ex: Hoje", horario="Ex: 20:00", imagem="Link da imagem (URL)", limitacoes="Regras de build/nível (Ex: Sem Bankai, Apenas Shikai)")
+@bot.tree.command(name="agendar_guerra", description="Inicia uma chamada para guerra (Apenas ADM)")
+@app_commands.describe(data="Ex: Hoje", horario="Ex: 20:00", imagem="Link da imagem (URL)", limitacoes="Regras de build/nível")
+@app_commands.checks.has_permissions(administrator=True) # TRAVA DE ADM
 async def agendar_guerra(interaction: Interaction, data: str, horario: str, imagem: str, limitacoes: str):
     embed = discord.Embed(
         title="⚔️ CONVOCAÇÃO DE GUERRA",
@@ -272,7 +262,11 @@ async def agendar_guerra(interaction: Interaction, data: str, horario: str, imag
     view = GuerraView(imagem_url=imagem)
     await interaction.response.send_message(embed=embed, view=view)
 
-# --- Comandos de Mídia ---
+# Tratamento de erro caso alguém sem permissão tente usar
+@agendar_guerra.error
+async def agendar_guerra_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.MissingPermissions):
+        await interaction.response.send_message("❌ **Acesso Negado:** Apenas administradores podem agendar guerras!", ephemeral=True)
 
 @bot.tree.command(name="videogif", description="Converte um vídeo para GIF (máximo 5 segundos)")
 async def videogif(interaction: Interaction, arquivo: discord.Attachment):
@@ -393,12 +387,23 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
         embed=embed
     )
 
+# =========================
+# INICIALIZAÇÃO COM TRAVA DE SEGURANÇA (RENDER)
+# =========================
 if __name__ == "__main__":
-    # Garante que o Flask inicie ANTES do bot para o Render detectar a porta
+    # 1. Inicia o Flask ANTES do bot para garantir que o Render encontre a porta 10000
     keep_alive() 
     
-    # Adicionamos um pequeno delay ou apenas rodamos o bot
     try:
+        # Tenta conectar o bot
         bot.run(DISCORD_TOKEN)
-    except Exception as e:
-        print(f"❌ Erro ao iniciar o bot: {e}")
+    except discord.errors.HTTPException as e:
+        # Se receber erro 429 (Rate Limit), entra em modo de espera
+        if e.status == 429:
+            print("🛑 RATE LIMIT DETECTADO! O IP está bloqueado temporariamente pelo Discord.")
+            print("O servidor Flask continuará rodando para não derrubar o Deploy.")
+            # Loop infinito para manter o processo vivo sem spammar o Discord
+            while True: 
+                time.sleep(3600)
+        else:
+            raise e

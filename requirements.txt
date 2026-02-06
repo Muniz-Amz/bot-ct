@@ -4,3 +4,4 @@ Flask==2.3.3
 moviepy==1.0.3
 decorator==4.4.2
 proglog==0.1.10
+requests==2.31.0
