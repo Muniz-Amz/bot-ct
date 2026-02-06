@@ -394,4 +394,11 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
     )
 
 if __name__ == "__main__":
-    bot.run(DISCORD_TOKEN)
+    # Garante que o Flask inicie ANTES do bot para o Render detectar a porta
+    keep_alive() 
+    
+    # Adicionamos um pequeno delay ou apenas rodamos o bot
+    try:
+        bot.run(DISCORD_TOKEN)
+    except Exception as e:
+        print(f"❌ Erro ao iniciar o bot: {e}")
