@@ -10,6 +10,7 @@ import asyncio
 import logging
 import random
 from moviepy.editor import VideoFileClip
+import moviepy.config as conf
 
 # =========================
 # CONFIGURAÇÕES DE LOG E TOKEN
