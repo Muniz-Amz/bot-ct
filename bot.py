@@ -9,16 +9,41 @@ from threading import Thread
 import asyncio
 import logging
 import random
-from moviepy.editor import VideoFileClip
+import time
+import subprocess
+import traceback
+from datetime import datetime
 
 # =========================
-# CONFIGURAÇÕES DE LOG E TOKEN
+# 1. CONFIGURAÇÕES INICIAIS E LOGS
 # =========================
 logging.basicConfig(level=logging.INFO)
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
+# Cria a pasta de manutenção para salvar erros detalhados
+PASTA_MANUTENCAO = "manutencao"
+if not os.path.exists(PASTA_MANUTENCAO):
+    os.makedirs(PASTA_MANUTENCAO)
+
+def registrar_erro(contexto, erro):
+    """Salva erros em um arquivo de texto para auditoria"""
+    data_hora = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+    arquivo = os.path.join(PASTA_MANUTENCAO, "erros_detalhados.txt")
+    
+    try:
+        with open(arquivo, "a", encoding="utf-8") as f:
+            f.write(f"\n{'='*50}\n")
+            f.write(f"📅 DATA: {data_hora}\n")
+            f.write(f"📂 LOCAL: {contexto}\n")
+            f.write(f"⚠️ ERRO: {erro}\n")
+            f.write(f"🔍 TRACEBACK:\n{traceback.format_exc()}")
+            f.write(f"{'='*50}\n")
+        print(f"🚨 Erro registrado em {arquivo}")
+    except Exception as e_log:
+        print(f"Erro ao salvar log: {e_log}")
+
 # =========================
-# SISTEMA KEEP ALIVE (FLASK)
+# 2. SISTEMA KEEP ALIVE (FLASK)
 # =========================
 app = Flask(__name__)
 
@@ -28,7 +53,10 @@ def home():
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    try:
+        app.run(host="0.0.0.0", port=port)
+    except Exception as e:
+        registrar_erro("Flask Server", e)
 
 def keep_alive():
     t = Thread(target=run_flask)
@@ -38,7 +66,7 @@ def keep_alive():
 keep_alive()
 
 # =========================
-# CONFIGURAÇÃO DO BOT
+# 3. CONFIGURAÇÃO DO BOT
 # =========================
 intents = discord.Intents.default()
 intents.message_content = True 
@@ -46,7 +74,35 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 # =========================
-# SISTEMA DE GUERRA (LOGICA ATUALIZADA)
+# 4. FUNÇÕES DE PROCESSAMENTO DE MÍDIA (FFMPEG OTIMIZADO)
+# =========================
+# ATENÇÃO: Usamos subprocess/ffmpeg aqui para não estourar a RAM do Render
+
+def converter_imagem_sync(input_path, output_path):
+    with Image.open(input_path) as img:
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        img.save(output_path, format="GIF")
+
+def extrair_audio_sync(v_path, a_path):
+    # Extrai áudio sem carregar o vídeo na RAM
+    comando = [
+        'ffmpeg', '-i', v_path, '-vn', 
+        '-acodec', 'libmp3lame', '-q:a', '4', '-y', a_path
+    ]
+    subprocess.run(comando, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+
+def converter_video_gif_sync(v_path, g_path):
+    # Converte para GIF redimensionando para 320px de largura para ficar leve
+    comando = [
+        'ffmpeg', '-i', v_path, 
+        '-vf', 'fps=10,scale=320:-1:flags=lanczos', 
+        '-c:v', 'gif', '-f', 'gif', '-y', g_path
+    ]
+    subprocess.run(comando, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+
+# =========================
+# 5. SISTEMA DE GUERRA (VIEW E LÓGICA)
 # =========================
 class GuerraView(discord.ui.View):
     def __init__(self, imagem_url):
@@ -99,7 +155,7 @@ class GuerraView(discord.ui.View):
             await interaction.response.edit_message(view=self)
             await interaction.channel.send(content="🚨 **ATENÇÃO GUERREIROS! TIMES DEFINIDOS!**", embed=embed_times)
         else:
-            # Se não lotou, apenas atualiza a mensagem e manda o aviso de punição no privado
+            # Se não lotou, apenas atualiza a mensagem
             await interaction.response.edit_message(view=self)
             await interaction.followup.send("✅ **Inscrição Confirmada!**\n⚠️ **ATENÇÃO:** Se você não aparecer no horário marcado, receberá **MUTE**. Em caso de reincidência, será aplicado **WARN**.", ephemeral=True)
 
@@ -113,33 +169,14 @@ class GuerraView(discord.ui.View):
         self.participantes.remove(interaction.user)
         
         # Atualiza o botão de contagem (o primeiro botão da lista)
-        botao_participar = self.children[0] # Pega o botão verde pelo índice
+        botao_participar = self.children[0] 
         botao_participar.label = f"⚔️ Participar ({len(self.participantes)}/12)"
         
         await interaction.response.edit_message(view=self)
         await interaction.followup.send("🗑️ Você cancelou sua inscrição.", ephemeral=True)
 
 # =========================
-# FUNÇÕES DE PROCESSAMENTO
-# =========================
-def converter_imagem_sync(input_path, output_path):
-    with Image.open(input_path) as img:
-        if img.mode in ("RGBA", "P"):
-            img = img.convert("RGB")
-        img.save(output_path, format="GIF")
-
-def extrair_audio_sync(video_path, audio_path):
-    with VideoFileClip(video_path, target_resolution=(120, None)) as video:
-        video.audio.write_audiofile(audio_path, logger=None, bitrate="64k")
-
-def converter_video_gif_sync(video_path, gif_path):
-    with VideoFileClip(video_path, audio=False, target_resolution=(300, None), fps_source="fps") as clip:
-        duracao = min(clip.duration, 5)
-        final = clip.subclip(0, duracao)
-        final.write_gif(gif_path, fps=10, logger=None, colors=128, opt="OptimizePlus")
-
-# =========================
-# EVENTOS DO BOT
+# 6. EVENTOS DO BOT
 # =========================
 @bot.event
 async def on_ready():
@@ -176,10 +213,10 @@ async def on_member_join(member):
     except discord.Forbidden:
         print(f"❌ DM fechada para {member.name}.")
     except Exception as e:
-        print(f"❌ Erro no on_member_join: {e}")
+        registrar_erro("on_member_join", e)
 
 # =========================
-# COMANDOS ADMINISTRATIVOS
+# 7. COMANDOS ADMINISTRATIVOS
 # =========================
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -188,7 +225,7 @@ async def deploy(ctx):
     await ctx.send("✅ **Comandos Slash sincronizados com sucesso!**")
 
 # =========================
-# COMANDOS SLASH (/)
+# 8. COMANDOS SLASH (/)
 # =========================
 
 @bot.tree.command(name="help", description="Mostra a lista completa de comandos e como usá-los")
@@ -271,21 +308,24 @@ async def agendar_guerra(interaction: Interaction, data: str, horario: str, imag
     view = GuerraView(imagem_url=imagem)
     await interaction.response.send_message(embed=embed, view=view)
 
-# --- Comandos de Mídia ---
+# --- Comandos de Mídia (Corrigidos para não travar) ---
 
-@bot.tree.command(name="videogif", description="Converte um vídeo para GIF (máximo 5 segundos)")
+@bot.tree.command(name="videogif", description="Converte um vídeo para GIF (Otimizado)")
 async def videogif(interaction: Interaction, arquivo: discord.Attachment):
     if not arquivo.content_type.startswith("video"): 
         return await interaction.response.send_message("❌ Por favor, envie um arquivo de vídeo!")
     
     await interaction.response.defer()
     v_path, g_path = f"v_{uuid.uuid4()}.mp4", f"g_{uuid.uuid4()}.gif"
+    
     try:
         await arquivo.save(v_path)
+        # Usa thread para não travar o bot, chama a função nova com FFMPEG
         await asyncio.to_thread(converter_video_gif_sync, v_path, g_path)
         await interaction.followup.send(file=discord.File(g_path))
-    except Exception:
-        await interaction.followup.send("❌ Erro ao converter o vídeo.")
+    except Exception as e:
+        registrar_erro("videogif", e)
+        await interaction.followup.send("❌ Erro ao converter o vídeo. Verifique o log.")
     finally:
         for p in (v_path, g_path):
             if os.path.exists(p): os.remove(p)
@@ -294,12 +334,20 @@ async def videogif(interaction: Interaction, arquivo: discord.Attachment):
 async def videoaudio(interaction: Interaction, arquivo: discord.Attachment):
     await interaction.response.defer()
     v_path, a_path = f"v_{uuid.uuid4()}.mp4", f"a_{uuid.uuid4()}.mp3"
+    
     try:
         await arquivo.save(v_path)
+        # Usa a função nova com FFMPEG
         await asyncio.to_thread(extrair_audio_sync, v_path, a_path)
-        await interaction.followup.send(file=discord.File(a_path))
-    except Exception:
-        await interaction.followup.send("❌ Erro ao extrair áudio.")
+        
+        # Verifica tamanho final (Discord aceita max 25MB)
+        if os.path.getsize(a_path) > 25 * 1024 * 1024:
+            await interaction.followup.send("⚠️ O arquivo final ficou maior que 25MB e não pode ser enviado.")
+        else:
+            await interaction.followup.send(file=discord.File(a_path))
+    except Exception as e:
+        registrar_erro("videoaudio", e)
+        await interaction.followup.send("❌ Erro ao converter. O arquivo pode ser muito pesado.")
     finally:
         for p in (v_path, a_path):
             if os.path.exists(p): os.remove(p)
@@ -312,7 +360,8 @@ async def gifct(interaction: Interaction, arquivo: discord.Attachment):
         await arquivo.save(i_path)
         await asyncio.to_thread(converter_imagem_sync, i_path, o_path)
         await interaction.followup.send(file=discord.File(o_path))
-    except Exception:
+    except Exception as e:
+        registrar_erro("gifct", e)
         await interaction.followup.send("❌ Erro ao processar imagem.")
     finally:
         for p in (i_path, o_path):
@@ -392,5 +441,31 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
         embed=embed
     )
 
+# =========================
+# 9. INICIALIZAÇÃO SEGURA (ANTI-429)
+# =========================
 if __name__ == "__main__":
-    bot.run(DISCORD_TOKEN)
+    while True:
+        try:
+            if not DISCORD_TOKEN:
+                print("❌ TOKEN NÃO ENCONTRADO! Verifique as variáveis de ambiente.")
+                break
+            
+            print("🚀 Iniciando Celestial Bot...")
+            bot.run(DISCORD_TOKEN)
+            
+        except discord.errors.HTTPException as e:
+            if e.status == 429:
+                registrar_erro("Conexão (Rate Limit)", e)
+                print("⚠️ IP bloqueado pelo Discord (Rate Limit).")
+                print("⏳ Aguardando 10 minutos para tentar novamente...")
+                time.sleep(600) # Espera 10 minutos
+            else:
+                registrar_erro("Erro HTTP Geral", e)
+                print(f"❌ Erro de conexão: {e}")
+                time.sleep(10)
+                
+        except Exception as e:
+            registrar_erro("Erro Crítico no Main", e)
+            print(f"❌ Erro Crítico: {e}")
+            time.sleep(10)
