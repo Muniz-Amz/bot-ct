@@ -361,37 +361,44 @@ async def regras(interaction: discord.Interaction):
 @bot.tree.command(name="solicitar", description="Envia uma solicitação para a liderança aceitar seu pedido no grupo do Roblox")
 @app_commands.describe(nick_roblox="Seu nome de usuário (Username) no Roblox")
 async def solicitar(interaction: discord.Interaction, nick_roblox: str):
-    # IDs dos cargos fornecidos
-    cargos_id = [
-        1395092778614132777,
-        1458811065583403323,
-        1425983765053837402,
-        1467634329214652486
-    ]
+    # IDs dos administradores que receberão a DM
+    adms_ids = [845105032449884161, 1041870714124382258, 1129212119213146136]
     
-    # Criando a string de menção para todos os cargos
+    # IDs dos cargos para a menção no canal (os que você já tinha)
+    cargos_id = [1395092778614132777, 1458811065583403323, 1425983765053837402, 1467634329214652486]
     mencoes = " ".join([f"<@&{id_cargo}>" for id_cargo in cargos_id])
     
     link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
     
+    # Criando o Embed
     embed = discord.Embed(
         title="📝 Nova Solicitação de Entrada",
         description=f"O membro {interaction.user.mention} solicitou aprovação no grupo do Roblox.",
         color=discord.Color.blue()
     )
-    
     embed.add_field(name="👤 Nick no Roblox", value=f"`{nick_roblox}`", inline=True)
     embed.add_field(name="🔗 Perfil", value=f"[Abrir Perfil](https://www.roblox.com/users/profile?username={nick_roblox})", inline=True)
     embed.add_field(name="🛡️ Grupo", value=f"[Verificar Pedidos]({link_grupo})", inline=False)
-    
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
     embed.set_footer(text="Celestial Trindade - Sistema de Recrutamento")
 
-    # Envia a mensagem marcando todos os cargos de ADM/Liderança
+    # 1. Responde no canal primeiro para confirmar ao usuário
     await interaction.response.send_message(
         content=f"🔔 {mencoes}, novo guerreiro aguardando aprovação!", 
         embed=embed
     )
+
+    # 2. Envio das DMs para os líderes
+    for adm_id in adms_ids:
+        try:
+            admin = await bot.fetch_user(adm_id) # Busca o usuário pelo ID
+            if admin:
+                # Cria um embed simplificado para a DM ou usa o mesmo
+                await admin.send(f"⚠️ **Alerta de Recrutamento:** {interaction.user.name} pediu para entrar no grupo!", embed=embed)
+                # Pequena pausa para não ser banido por spam (Rate Limit)
+                await asyncio.sleep(1) 
+        except Exception as e:
+            print(f"❌ Não consegui enviar DM para o ID {adm_id}: {e}")
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
