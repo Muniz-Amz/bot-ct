@@ -11,6 +11,7 @@ import logging
 import random
 from moviepy.editor import VideoFileClip
 import time
+from datetime import datetime, timezone
 
 # =========================
 # CONFIGURAÇÕES DE LOG E TOKEN
@@ -142,6 +143,20 @@ def converter_video_gif_sync(video_path, gif_path):
 # =========================
 # EVENTOS DO BOT
 # =========================
+@bot.event
+async def on_member_join(member):
+    # Calcula a idade da conta
+    agora = datetime.now(timezone.utc)
+    idade_conta = agora - member.created_at
+
+    # Se a conta tiver menos de 7 dias (7 dias * 24h * 3600s)
+    if idade_conta.total_seconds() < 604800:
+        try:
+            await member.send("🛡️ **Celestial Trindade:** Sua conta é muito recente. Para evitar fakes, só aceitamos contas com mais de 7 dias.")
+            await member.kick(reason="Conta muito nova (possível alt/fake).")
+        except:
+            pass
+        
 @bot.event
 async def on_ready():
     print(f"✅ Bot logado como {bot.user}")
