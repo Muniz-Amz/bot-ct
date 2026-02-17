@@ -305,44 +305,28 @@ async def videogif(interaction: Interaction, arquivo: discord.Attachment):
     finally:
         for p in (v_path, g_path):
             if os.path.exists(p): os.remove(p)
-            
-@bot.tree.command(name="ally", description="Registra e exibe uma guilda aliada com logo atualizada")
+@bot.tree.command(name="ally", description="Exibe a logo e o nome de uma guilda aliada")
 @app_commands.describe(nome="Nome da guilda aliada", id_grupo="O ID numérico do grupo no Roblox")
 async def ally(interaction: discord.Interaction, nome: str, id_grupo: str):
-    # Link oficial do grupo
-    link_roblox = f"https://www.roblox.com/communities/{id_grupo}"
+    # Link do grupo
+    link_grupo = f"https://www.roblox.com/communities/{id_grupo}"
     
-    # URL da API do Roblox que gera a imagem do grupo (Thumbnail)
-    # Formato: 420x420 pixels, formato PNG
-    logo_url = f"https://tr.rbxcdn.com/30DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Png/noFilter"
-    
-    # Nota: A URL acima é um padrão, mas para garantir que pegue o ID certo, 
-    # usamos este endpoint direto do Roblox:
-    api_logo = f"https://www.roblox.com/group-thumbnails?groupId={id_grupo}&size=420x420&format=png"
-    # Mas a forma mais moderna e que funciona direto no Discord Embed é:
-    thumb_url = f"https://tr.rbxcdn.com/8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Png/noFilter"
-    
-    # Vamos usar uma lógica de montagem de Embed elegante
+    # Endpoint do Roblox que redireciona para a imagem da logo do grupo
+    # Esse link busca automaticamente a logo atualizada do ID fornecido
+    logo_url = f"https://www.roblox.com/group-thumbnails?groupId={id_grupo}&size=420x420&format=png"
+
     embed = discord.Embed(
-        title="🤝 NOVA ALIANÇA ESTABELECIDA",
-        description=f"A **Celestial Trindade** agora caminha ao lado da guilda **{nome}**!",
-        color=discord.Color.green() # Verde para simbolizar aliança/paz
+        title=f"🤝 Aliança: {nome}",
+        description=f"[Clique aqui para visitar o grupo]({link_grupo})",
+        color=discord.Color.blue()
     )
     
-    embed.add_field(name="🏰 Guilda Aliada", value=f"**{nome}**", inline=True)
-    embed.add_field(name="🆔 Group ID", value=f"`{id_grupo}`", inline=True)
-    embed.add_field(name="🔗 Link do Grupo", value=f"[CLIQUE PARA VISITAR]({link_roblox})", inline=False)
+    # Define a imagem como a foto principal (grande) do Embed
+    embed.set_image(url=logo_url)
     
-    # Puxando a logo do grupo dinamicamente
-    # O Roblox usa esse padrão de URL para logos de grupo:
-    image_link = f"https://tr.rbxcdn.com/6090e82c5f958428987a0c0e76878b2d/420/420/Image/Png/noFilter"
-    # Como gerar o link da imagem exata é complexo sem requests, 
-    # o ideal é passar o link que você já tem ou usar o ID no thumbnail:
-    embed.set_thumbnail(url=api_logo) 
-    
-    embed.set_footer(text="Aliança Celestial - Honra e Lealdade")
-    
-    await interaction.response.send_message(content="📜 **Documento de Aliança registrado!**", embed=embed)
+    embed.set_footer(text="Celestial Trindade - Diplomacia")
+
+    await interaction.response.send_message(embed=embed)
 @bot.tree.command(name="videoaudio", description="Converte um vídeo para arquivo de áudio MP3")
 async def videoaudio(interaction: Interaction, arquivo: discord.Attachment):
     await interaction.response.defer()
