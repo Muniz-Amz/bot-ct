@@ -305,28 +305,42 @@ async def videogif(interaction: Interaction, arquivo: discord.Attachment):
     finally:
         for p in (v_path, g_path):
             if os.path.exists(p): os.remove(p)
+import aiohttp # Certifique-se de ter 'aiohttp' instalado (pip install aiohttp)
+
 @bot.tree.command(name="ally", description="Exibe a logo e o nome de uma guilda aliada")
 @app_commands.describe(nome="Nome da guilda aliada", id_grupo="O ID numérico do grupo no Roblox")
 async def ally(interaction: discord.Interaction, nome: str, id_grupo: str):
-    # Link do grupo
+    await interaction.response.defer() # O bot fica "pensando" enquanto busca a imagem
+
     link_grupo = f"https://www.roblox.com/communities/{id_grupo}"
     
-    # Endpoint do Roblox que redireciona para a imagem da logo do grupo
-    # Esse link busca automaticamente a logo atualizada do ID fornecido
-    logo_url = f"https://www.roblox.com/group-thumbnails?groupId={id_grupo}&size=420x420&format=png"
+    # API oficial para pegar o link direto da imagem
+    api_url = f"https://thumbnails.roblox.com/v1/groups/icons?groupIds={id_grupo}&size=420x420&format=Png&isCircular=false"
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.get(api_url) as response:
+            if response.status == 200:
+                data = await response.json()
+                # Extrai a URL real da imagem da resposta da API
+                logo_final = data['data'][0]['imageUrl']
+            else:
+                # Caso a API falhe, usa uma imagem padrão ou erro
+                logo_final = None
 
     embed = discord.Embed(
         title=f"🤝 Aliança: {nome}",
-        description=f"[Clique aqui para visitar o grupo]({link_grupo})",
+        description=f"**Celestial Trindade** caminha junto a **{nome}**.\n\n[Clique aqui para visitar o grupo]({link_grupo})",
         color=discord.Color.blue()
     )
     
-    # Define a imagem como a foto principal (grande) do Embed
-    embed.set_image(url=logo_url)
-    
+    if logo_final:
+        embed.set_image(url=logo_final) # Agora o link é direto e o espaço da imagem aparecerá
+    else:
+        embed.set_footer(text="Não foi possível carregar a logo do grupo.")
+
     embed.set_footer(text="Celestial Trindade - Diplomacia")
 
-    await interaction.response.send_message(embed=embed)
+    await interaction.followup.send(embed=embed)
 @bot.tree.command(name="videoaudio", description="Converte um vídeo para arquivo de áudio MP3")
 async def videoaudio(interaction: Interaction, arquivo: discord.Attachment):
     await interaction.response.defer()
