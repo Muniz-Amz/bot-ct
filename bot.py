@@ -12,6 +12,7 @@ import random
 from moviepy.editor import VideoFileClip
 import time
 from datetime import datetime, timezone
+import aiohttp
 
 # =========================
 # CONFIGURAÇÕES DE LOG E TOKEN
@@ -307,24 +308,29 @@ async def videogif(interaction: Interaction, arquivo: discord.Attachment):
             if os.path.exists(p): os.remove(p)
 import aiohttp # Certifique-se de ter 'aiohttp' instalado (pip install aiohttp)
 
-@bot.tree.command(name="ally", description="Exibe a logo e o nome de uma guilda aliada")
+import aiohttp
+import time
+
+@bot.tree.command(name="ally", description="Exibe a logo atualizada de uma guilda aliada")
 @app_commands.describe(nome="Nome da guilda aliada", id_grupo="O ID numérico do grupo no Roblox")
 async def ally(interaction: discord.Interaction, nome: str, id_grupo: str):
-    await interaction.response.defer() # O bot fica "pensando" enquanto busca a imagem
+    await interaction.response.defer() # Evita que o comando expire
 
     link_grupo = f"https://www.roblox.com/communities/{id_grupo}"
-    
-    # API oficial para pegar o link direto da imagem
     api_url = f"https://thumbnails.roblox.com/v1/groups/icons?groupIds={id_grupo}&size=420x420&format=Png&isCircular=false"
     
     async with aiohttp.ClientSession() as session:
         async with session.get(api_url) as response:
             if response.status == 200:
                 data = await response.json()
-                # Extrai a URL real da imagem da resposta da API
-                logo_final = data['data'][0]['imageUrl']
+                if data['data']:
+                    logo_base = data['data'][0]['imageUrl']
+                    # O TRUQUE: Adicionamos o tempo atual no final do link.
+                    # Isso cria um "link único" que força o Discord a baixar a imagem agora.
+                    logo_final = f"{logo_base}?t={int(time.time())}"
+                else:
+                    logo_final = None
             else:
-                # Caso a API falhe, usa uma imagem padrão ou erro
                 logo_final = None
 
     embed = discord.Embed(
@@ -334,13 +340,14 @@ async def ally(interaction: discord.Interaction, nome: str, id_grupo: str):
     )
     
     if logo_final:
-        embed.set_image(url=logo_final) # Agora o link é direto e o espaço da imagem aparecerá
+        embed.set_image(url=logo_final)
     else:
-        embed.set_footer(text="Não foi possível carregar a logo do grupo.")
+        embed.set_footer(text="Aviso: Logo não encontrada ou pendente no Roblox.")
 
     embed.set_footer(text="Celestial Trindade - Diplomacia")
 
     await interaction.followup.send(embed=embed)
+    
 @bot.tree.command(name="videoaudio", description="Converte um vídeo para arquivo de áudio MP3")
 async def videoaudio(interaction: Interaction, arquivo: discord.Attachment):
     await interaction.response.defer()
