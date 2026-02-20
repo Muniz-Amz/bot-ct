@@ -11,7 +11,7 @@ import logging
 import random
 from moviepy.editor import VideoFileClip
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import aiohttp
 
 # =========================
@@ -47,6 +47,13 @@ intents = discord.Intents.default()
 intents.message_content = True 
 intents.members = True          
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+
+# =========================
+# CONFIGURAÇÃO De MOD
+# =========================
+# Seu ID
+MEU_ID = 1129212119213146136
+
 
 # =========================
 # SISTEMA DE GUERRA (LOGICA ATUALIZADA)
@@ -157,7 +164,44 @@ async def on_member_join(member):
             await member.kick(reason="Conta muito nova (possível alt/fake).")
         except:
             pass
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    # Verifica se a ação foi com VOCÊ e se você estava em uma call
+    if member.id == MEU_ID and before.channel is not None:
         
+        # Caso 1: Você foi movido (está em um canal diferente do anterior)
+        # Caso 2: Você foi desconectado (o canal atual 'after.channel' é None)
+        if after.channel != before.channel:
+            
+            # Pequena pausa para o Discord registrar o log de auditoria
+            await asyncio.sleep(0.8)
+            
+            # Busca o último log de 'Mover' ou 'Desconectar'
+            async for entry in member.guild.audit_logs(limit=1):
+                # Verifica se a ação foi recente e feita por outra pessoa
+                if entry.target.id == MEU_ID and entry.user.id != MEU_ID:
+                    
+                    # Checa se a ação foi mover ou desconectar
+                    if entry.action == discord.AuditLogAction.member_move or \
+                       entry.action == discord.AuditLogAction.member_disconnect:
+                        
+                        autor = entry.user
+                        
+                        try:
+                            # Aplica o Castigo (Timeout) de 1 minuto
+                            duracao = timedelta(minutes=1)
+                            await autor.timeout(duracao, reason="Moveu/Desconectou o Líder.")
+                            
+                            # Envia aviso no canal de onde você saiu ou no chat principal
+                            await before.channel.send(
+                                f"🛡️ **Justiça Celestial:** {autor.mention} foi castigado por 1 minuto por interferir com o superior."
+                            )
+                        except discord.Forbidden:
+                            print(f"Sem permissão para castigar {autor.name}")
+                        except Exception as e:
+                            print(f"Erro ao aplicar castigo: {e}")
+
 @bot.event
 async def on_ready():
     print(f"✅ Bot logado como {bot.user}")
