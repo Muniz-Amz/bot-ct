@@ -11,7 +11,7 @@ import logging
 import random
 from moviepy.editor import VideoFileClip
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import aiohttp
 
 # =========================
@@ -47,13 +47,6 @@ intents = discord.Intents.default()
 intents.message_content = True 
 intents.members = True          
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
-
-# =========================
-# CONFIGURAÇÃO De MOD
-# =========================
-# Seu ID
-MEU_ID = 1129212119213146136
-
 
 # =========================
 # SISTEMA DE GUERRA (LOGICA ATUALIZADA)
@@ -164,38 +157,7 @@ async def on_member_join(member):
             await member.kick(reason="Conta muito nova (possível alt/fake).")
         except:
             pass
-
-@bot.event
-async def on_voice_state_update(member, before, after):
-    # Verifica se a ação foi com VOCÊ
-    if member.id == MEU_ID and before.channel is not None:
         
-        # Se você mudou de canal ou foi desconectado
-        if after.channel != before.channel:
-            
-            # Espera um pouco mais para o log ser processado pelo Discord
-            await asyncio.sleep(1.2)
-            
-            try:
-                # Busca os últimos logs de auditoria
-                async for entry in member.guild.audit_logs(limit=3):
-                    # VERIFICAÇÃO DE SEGURANÇA: Se o log existe e tem um alvo
-                    if entry and entry.target and entry.target.id == MEU_ID:
-                        
-                        # Se o autor NÃO for você, aplica o castigo
-                        if entry.user.id != MEU_ID:
-                            if entry.action in [discord.AuditLogAction.member_move, discord.AuditLogAction.member_disconnect]:
-                                
-                                autor = entry.user
-                                duracao = timedelta(minutes=1)
-                                
-                                await autor.timeout(duracao, reason="Interferiu com o Líder.")
-                                await before.channel.send(f"🛡️ **Justiça Celestial:** {autor.mention} castigado por 1 minuto.")
-                                return # Para o loop após encontrar o culpado
-                                
-            except Exception as e:
-                print(f"Erro ao processar defesa: {e}")
-
 @bot.event
 async def on_ready():
     print(f"✅ Bot logado como {bot.user}")
