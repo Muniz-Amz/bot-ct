@@ -306,46 +306,37 @@ async def videogif(interaction: Interaction, arquivo: discord.Attachment):
     finally:
         for p in (v_path, g_path):
             if os.path.exists(p): os.remove(p)
-import aiohttp # Certifique-se de ter 'aiohttp' instalado (pip install aiohttp)
 
-import aiohttp
-import time
-
+# =========================
+# COMANDO: ALLY COM CACHE BREAK (FIXED)
+# =========================
 @bot.tree.command(name="ally", description="Exibe a logo atualizada de uma guilda aliada")
 @app_commands.describe(nome="Nome da guilda aliada", id_grupo="O ID numérico do grupo no Roblox")
 async def ally(interaction: discord.Interaction, nome: str, id_grupo: str):
-    await interaction.response.defer() # Evita que o comando expire
+    # Defer evita o erro "Unknown Interaction" (404/10062)
+    await interaction.response.defer() 
 
     link_grupo = f"https://www.roblox.com/communities/{id_grupo}"
     api_url = f"https://thumbnails.roblox.com/v1/groups/icons?groupIds={id_grupo}&size=420x420&format=Png&isCircular=false"
     
+    logo_final = None
     async with aiohttp.ClientSession() as session:
         async with session.get(api_url) as response:
             if response.status == 200:
                 data = await response.json()
                 if data['data']:
-                    logo_base = data['data'][0]['imageUrl']
-                    # O TRUQUE: Adicionamos o tempo atual no final do link.
-                    # Isso cria um "link único" que força o Discord a baixar a imagem agora.
-                    logo_final = f"{logo_base}?t={int(time.time())}"
-                else:
-                    logo_final = None
-            else:
-                logo_final = None
+                    # ?t= força o Discord a ignorar o cache da imagem antiga
+                    logo_final = f"{data['data'][0]['imageUrl']}?t={int(time.time())}"
 
     embed = discord.Embed(
         title=f"🤝 Aliança: {nome}",
         description=f"**Celestial Trindade** caminha junto a **{nome}**.\n\n[Clique aqui para visitar o grupo]({link_grupo})",
         color=discord.Color.blue()
     )
-    
-    if logo_final:
-        embed.set_image(url=logo_final)
-    else:
-        embed.set_footer(text="Aviso: Logo não encontrada ou pendente no Roblox.")
-
+    if logo_final: embed.set_image(url=logo_final)
     embed.set_footer(text="Celestial Trindade - Diplomacia")
 
+    # Followup é obrigatório após o defer
     await interaction.followup.send(embed=embed)
     
 @bot.tree.command(name="videoaudio", description="Converte um vídeo para arquivo de áudio MP3")
