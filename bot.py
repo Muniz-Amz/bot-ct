@@ -20,9 +20,9 @@ import aiohttp
 logging.basicConfig(level=logging.INFO)
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
-# =========================
+# ==========================
 # SISTEMA KEEP ALIVE (FLASK)
-# =========================
+# ==========================
 app = Flask(__name__)
 
 @app.route("/")
