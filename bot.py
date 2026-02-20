@@ -167,40 +167,34 @@ async def on_member_join(member):
 
 @bot.event
 async def on_voice_state_update(member, before, after):
-    # Verifica se a ação foi com VOCÊ e se você estava em uma call
+    # Verifica se a ação foi com VOCÊ
     if member.id == MEU_ID and before.channel is not None:
         
-        # Caso 1: Você foi movido (está em um canal diferente do anterior)
-        # Caso 2: Você foi desconectado (o canal atual 'after.channel' é None)
+        # Se você mudou de canal ou foi desconectado
         if after.channel != before.channel:
             
-            # Pequena pausa para o Discord registrar o log de auditoria
-            await asyncio.sleep(0.8)
+            # Espera um pouco mais para o log ser processado pelo Discord
+            await asyncio.sleep(1.2)
             
-            # Busca o último log de 'Mover' ou 'Desconectar'
-            async for entry in member.guild.audit_logs(limit=1):
-                # Verifica se a ação foi recente e feita por outra pessoa
-                if entry.target.id == MEU_ID and entry.user.id != MEU_ID:
-                    
-                    # Checa se a ação foi mover ou desconectar
-                    if entry.action == discord.AuditLogAction.member_move or \
-                       entry.action == discord.AuditLogAction.member_disconnect:
+            try:
+                # Busca os últimos logs de auditoria
+                async for entry in member.guild.audit_logs(limit=3):
+                    # VERIFICAÇÃO DE SEGURANÇA: Se o log existe e tem um alvo
+                    if entry and entry.target and entry.target.id == MEU_ID:
                         
-                        autor = entry.user
-                        
-                        try:
-                            # Aplica o Castigo (Timeout) de 1 minuto
-                            duracao = timedelta(minutes=1)
-                            await autor.timeout(duracao, reason="Moveu/Desconectou o Líder.")
-                            
-                            # Envia aviso no canal de onde você saiu ou no chat principal
-                            await before.channel.send(
-                                f"🛡️ **Justiça Celestial:** {autor.mention} foi castigado por 1 minuto por interferir com o superior."
-                            )
-                        except discord.Forbidden:
-                            print(f"Sem permissão para castigar {autor.name}")
-                        except Exception as e:
-                            print(f"Erro ao aplicar castigo: {e}")
+                        # Se o autor NÃO for você, aplica o castigo
+                        if entry.user.id != MEU_ID:
+                            if entry.action in [discord.AuditLogAction.member_move, discord.AuditLogAction.member_disconnect]:
+                                
+                                autor = entry.user
+                                duracao = timedelta(minutes=1)
+                                
+                                await autor.timeout(duracao, reason="Interferiu com o Líder.")
+                                await before.channel.send(f"🛡️ **Justiça Celestial:** {autor.mention} castigado por 1 minuto.")
+                                return # Para o loop após encontrar o culpado
+                                
+            except Exception as e:
+                print(f"Erro ao processar defesa: {e}")
 
 @bot.event
 async def on_ready():
