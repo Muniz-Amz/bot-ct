@@ -49,6 +49,62 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 # =========================
+# Botão Do Rejeitar
+# =========================
+class SolicitacaoView(discord.ui.View):
+    def __init__(self, candidato_id: int):
+        super().__init__(timeout=None) # Não expira sozinho
+        self.candidato_id = candidato_id
+
+    # Função auxiliar para desativar os botões após alguém clicar
+    async def desativar_botoes(self, interaction: discord.Interaction):
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(view=self)
+
+    # BOTÃO 1: ACEITAR
+    @discord.ui.button(label="✅ Aceitar", style=discord.ButtonStyle.success, custom_id="btn_aceitar")
+    async def aceitar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.desativar_botoes(interaction)
+        
+        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
+        if candidato:
+            try:
+                await candidato.send("🎉 **Parabéns!** Sua solicitação para entrar na **Celestial Trindade** foi **ACEITA**! Seja muito bem-vindo à guilda.")
+            except discord.Forbidden:
+                pass
+        
+        await interaction.followup.send("✅ Você aceitou o membro. Aviso enviado!", ephemeral=True)
+
+    # BOTÃO 2: RECUSAR
+    @discord.ui.button(label="❌ Recusar", style=discord.ButtonStyle.danger, custom_id="btn_recusar")
+    async def recusar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.desativar_botoes(interaction)
+        
+        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
+        if candidato:
+            try:
+                await candidato.send("❌ **Aviso:** Sua solicitação para a **Celestial Trindade** foi **RECUSADA** pelos líderes no momento.")
+            except discord.Forbidden:
+                pass
+        
+        await interaction.followup.send("❌ Você recusou o membro. Aviso enviado!", ephemeral=True)
+
+    # BOTÃO 3: FALTOU PEDIDO NO ROBLOX
+    @discord.ui.button(label="⚠️ Faltou Pedido", style=discord.ButtonStyle.secondary, custom_id="btn_faltou")
+    async def faltou_pedido(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.desativar_botoes(interaction)
+        
+        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
+        if candidato:
+            try:
+                link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
+                await candidato.send(f"⚠️ **Atenção:** Os líderes verificaram, mas **você ainda não enviou o pedido no grupo do Roblox**.\nPor favor, entre no link, clique em 'Join Group' (Entrar no Grupo) e faça o comando `/solicitar` novamente no servidor.\n🔗 {link_grupo}")
+            except discord.Forbidden:
+                pass
+        
+        await interaction.followup.send("⚠️ Você avisou que ele não fez o pedido no Roblox.", ephemeral=True)
+# =========================
 # SISTEMA DE GUERRA (LOGICA ATUALIZADA)
 # =========================
 class GuerraView(discord.ui.View):
@@ -406,19 +462,64 @@ async def regras(interaction: discord.Interaction):
     # Enviando tudo de uma vez
     await interaction.response.send_message(embeds=[embed1, embed2, embed3])
 
-@bot.tree.command(name="solicitar", description="Envia uma solicitação para a liderança aceitar seu pedido no grupo do Roblox")
+# =========================
+# SISTEMA DE BOTÕES (DMs DOS LÍDERES)
+# =========================
+class SolicitacaoView(discord.ui.View):
+    def __init__(self, candidato_id: int):
+        super().__init__(timeout=None)
+        self.candidato_id = candidato_id
+
+    async def desativar_botoes(self, interaction: discord.Interaction):
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(view=self)
+
+    @discord.ui.button(label="✅ Aceitar", style=discord.ButtonStyle.success, custom_id="btn_aceitar")
+    async def aceitar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.desativar_botoes(interaction)
+        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
+        if candidato:
+            try:
+                await candidato.send("🎉 **Parabéns!** Sua solicitação para entrar na **Celestial Trindade** foi **ACEITA**! Seja muito bem-vindo à guilda.")
+            except: pass
+        await interaction.followup.send("✅ Você aceitou o membro. Mensagem enviada!", ephemeral=True)
+
+    @discord.ui.button(label="❌ Recusar", style=discord.ButtonStyle.danger, custom_id="btn_recusar")
+    async def recusar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.desativar_botoes(interaction)
+        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
+        if candidato:
+            try:
+                await candidato.send("❌ **Aviso:** Sua solicitação para a **Celestial Trindade** foi **RECUSADA** pelos líderes no momento.")
+            except: pass
+        await interaction.followup.send("❌ Você recusou o membro. Mensagem enviada!", ephemeral=True)
+
+    @discord.ui.button(label="⚠️ Faltou Pedido", style=discord.ButtonStyle.secondary, custom_id="btn_faltou")
+    async def faltou_pedido(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.desativar_botoes(interaction)
+        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
+        if candidato:
+            try:
+                link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
+                await candidato.send(f"⚠️ **Atenção:** Os líderes verificaram, mas **você ainda não enviou o pedido no grupo do Roblox**.\nPor favor, entre no link, clique em 'Join Group' e faça o comando `/solicitar` novamente.\n🔗 {link_grupo}")
+            except: pass
+        await interaction.followup.send("⚠️ Você avisou que ele não fez o pedido. Mensagem enviada!", ephemeral=True)
+
+# =========================
+# COMANDO /SOLICITAR
+# =========================
+@bot.tree.command(name="solicitar", description="Pede aprovação no grupo do Roblox")
 @app_commands.describe(nick_roblox="Seu nome de usuário (Username) no Roblox")
 async def solicitar(interaction: discord.Interaction, nick_roblox: str):
-    # IDs dos administradores que receberão a DM
+    # Avisa o Discord que vai demorar (evita o bot cair no Render)
+    await interaction.response.defer()
+
     adms_ids = [845105032449884161, 1041870714124382258, 1129212119213146136]
-    
-    # IDs dos cargos para a menção no canal (os que você já tinha)
     cargos_id = [1395092778614132777, 1458811065583403323, 1425983765053837402, 1467634329214652486]
     mencoes = " ".join([f"<@&{id_cargo}>" for id_cargo in cargos_id])
-    
     link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
     
-    # Criando o Embed
     embed = discord.Embed(
         title="📝 Nova Solicitação de Entrada",
         description=f"O membro {interaction.user.mention} solicitou aprovação no grupo do Roblox.",
@@ -430,23 +531,22 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
     embed.set_footer(text="Celestial Trindade - Sistema de Recrutamento")
 
-    # 1. Responde no canal primeiro para confirmar ao usuário
-    await interaction.response.send_message(
-        content=f"🔔 {mencoes}, novo guerreiro aguardando aprovação!", 
+    # Manda a mensagem pública no servidor
+    await interaction.followup.send(
+        content=f"🔔 {mencoes}, novo guerreiro aguardando aprovação!\n*A liderança já recebeu o painel de aprovação.*", 
         embed=embed
     )
 
-    # 2. Envio das DMs para os líderes
+    # Manda as DMs para os líderes COM OS BOTÕES
     for adm_id in adms_ids:
         try:
-            admin = await bot.fetch_user(adm_id) # Busca o usuário pelo ID
+            admin = await bot.fetch_user(adm_id)
             if admin:
-                # Cria um embed simplificado para a DM ou usa o mesmo
-                await admin.send(f"⚠️ **Alerta de Recrutamento:** {interaction.user.name} pediu para entrar no grupo!", embed=embed)
-                # Pequena pausa para não ser banido por spam (Rate Limit)
-                await asyncio.sleep(1) 
+                view = SolicitacaoView(candidato_id=interaction.user.id)
+                await admin.send(f"⚠️ **Ação Necessária:** {interaction.user.name} quer entrar na guilda. Escolha uma opção:", embed=embed, view=view)
+                await asyncio.sleep(0.5) 
         except Exception as e:
-            print(f"❌ Não consegui enviar DM para o ID {adm_id}: {e}")
+            print(f"❌ Não consegui enviar DM para o admin {adm_id}: {e}")
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
