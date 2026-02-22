@@ -537,7 +537,7 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
         embed=embed
     )
 
-    # Manda as DMs para os líderes COM OS BOTÕES
+    # Manda as DMs para os líderes COM OS BOTÕESe
     for adm_id in adms_ids:
         try:
             admin = await bot.fetch_user(adm_id)
