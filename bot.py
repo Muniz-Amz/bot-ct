@@ -445,7 +445,7 @@ async def regras(interaction: discord.Interaction):
         color=discord.Color.dark_red()
     )
     embed2.add_field(name="🛡️ Identidade", value="**1.** É obrigatório o uso da Logo da Guilda.\n**2.** Proibido lutar contra membros da guilda sem logo.", inline=False)
-    embed2.add_field(name="🚫 Combate e Traição", value="**3.** Proibido Grips/Mortes não justificadas contra membros ou Allys.\n**4.** Proibido deixar aliados morrerem na sua presença.\n**5.** Proibido usar o nome da guilda para causar má reputação.", inline=False)
+    embed2.add_field(name="🚫 Combate e Traição", value="**3.** Proibido Grips/Mortes não justificadas contra membros ou Allys.\n**4.** Proibido deixar aliados morrerem na sua presença.\n**5.** Proibido usar o nome da guilda para causar má reputação. \n**6.** Proibido tentar Burlar as Regras (Má Fé)", inline=False)
     embed2.add_field(name="⚠️ Observação", value="A guilda não protege membros que ajudam jogadores sem logo ou de guildas inimigas.", inline=False)
 
     # --- EMBED 3: SISTEMA DE WARNS ---
@@ -515,8 +515,8 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
     # Avisa o Discord que vai demorar (evita o bot cair no Render)
     await interaction.response.defer()
 
-    adms_ids = [845105032449884161, 1041870714124382258, 1129212119213146136]
-    cargos_id = [1395092778614132777, 1458811065583403323, 1425983765053837402, 1467634329214652486]
+    adms_ids = [845105032449884161, 1129212119213146136]
+    cargos_id = [1395092778614132777]
     mencoes = " ".join([f"<@&{id_cargo}>" for id_cargo in cargos_id])
     link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
     
@@ -537,7 +537,7 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
         embed=embed
     )
 
-    # Manda as DMs para os líderes COM OS BOTÕESe
+    # Manda as DMs para os líderes COM OS BOTÕES
     for adm_id in adms_ids:
         try:
             admin = await bot.fetch_user(adm_id)
