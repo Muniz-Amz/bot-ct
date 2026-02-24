@@ -570,7 +570,7 @@ class SolicitacaoView(discord.ui.View):
                 await candidato.send(f"⚠️ **Atenção:** Os líderes verificaram, mas **você ainda não enviou o pedido no grupo do Roblox**.\nPor favor, entre no link, clique em 'Join Group' e faça o comando `/solicitar` novamente.\n🔗 {link_grupo}")
             except: pass
         await interaction.followup.send("⚠️ Você avisou que ele não fez o pedido. Mensagem enviada!", ephemeral=True)
-        
+
 # ==========================================
 # O COMANDO /AVALIACAO
 # ==========================================
@@ -580,7 +580,7 @@ async def avaliacao(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
 
     # O ID do Avaliador que você me passou
-    avaliador_id = 1017444684022427738
+    avaliador_id = [845105032449884161, 1017444684022427738]
     
     # Embed que o AVALIADOR vai receber
     embed_aviso = discord.Embed(
