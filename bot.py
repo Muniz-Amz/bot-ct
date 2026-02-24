@@ -122,44 +122,34 @@ class AvaliacaoView(discord.ui.View):
 # =========================
 # Botão Do Rejeitar
 # =========================
+# --- BOTÕES PARA O COMANDO /SOLICITAR ---
 class SolicitacaoView(discord.ui.View):
     def __init__(self, candidato_id: int):
-        super().__init__(timeout=None) # Não expira sozinho
+        super().__init__(timeout=None)
         self.candidato_id = candidato_id
 
-    # Função auxiliar para desativar os botões após alguém clicar
-    async def desativar_botoes(self, interaction: discord.Interaction):
-        for item in self.children:
-            item.disabled = True
-        await interaction.response.edit_message(view=self)
-
-    # BOTÃO 1: ACEITAR
-    @discord.ui.button(label="✅ Aceitar", style=discord.ButtonStyle.success, custom_id="btn_aceitar")
+    @discord.ui.button(label="✅ Aceitar", style=discord.ButtonStyle.success)
     async def aceitar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.desativar_botoes(interaction)
-        
-        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
-        if candidato:
-            try:
-                await candidato.send("🎉 **Parabéns!** Sua solicitação para entrar na **Celestial Trindade** foi **ACEITA**! Seja muito bem-vindo à guilda.")
-            except discord.Forbidden:
-                pass
-        
-        await interaction.followup.send("✅ Você aceitou o membro. Aviso enviado!", ephemeral=True)
+        candidato = await bot.fetch_user(self.candidato_id)
+        if candidato: await candidato.send("🎉 Você foi aceito!")
+        await interaction.response.edit_message(view=None)
 
-    # BOTÃO 2: RECUSAR
-    @discord.ui.button(label="❌ Recusar", style=discord.ButtonStyle.danger, custom_id="btn_recusar")
+    @discord.ui.button(label="❌ Recusar", style=discord.ButtonStyle.danger)
     async def recusar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.desativar_botoes(interaction)
-        
-        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
-        if candidato:
-            try:
-                await candidato.send("❌ **Aviso:** Sua solicitação para a **Celestial Trindade** foi **RECUSADA** pelos líderes no momento.")
-            except discord.Forbidden:
-                pass
-        
-        await interaction.followup.send("❌ Você recusou o membro. Aviso enviado!", ephemeral=True)
+        candidato = await bot.fetch_user(self.candidato_id)
+        if candidato: await candidato.send("❌ Sua solicitação foi recusada.")
+        await interaction.response.edit_message(view=None)
+
+# --- BOTÕES PARA O COMANDO /AVALIACAO ---
+class AvaliacaoView(discord.ui.View):
+    def __init__(self, candidato_id: int):
+        super().__init__(timeout=None)
+        self.candidato_id = candidato_id
+
+    @discord.ui.button(label="📅 Agendar Avaliação", style=discord.ButtonStyle.primary)
+    async def agendar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Aqui ele abre o Modal (Formulário)
+        await interaction.response.send_modal(AvaliacaoModal(self.candidato_id))
 
     # BOTÃO 3: FALTOU PEDIDO NO ROBLOX
     @discord.ui.button(label="⚠️ Faltou Pedido", style=discord.ButtonStyle.secondary, custom_id="btn_faltou")
@@ -417,22 +407,21 @@ async def agendar_guerra(interaction: Interaction, data: str, horario: str, imag
 
 # --- Comandos de Mídia ---
 
-@bot.tree.command(name="videogif", description="Converte um vídeo para GIF (máximo 5 segundos)")
-async def videogif(interaction: Interaction, arquivo: discord.Attachment):
-    if not arquivo.content_type.startswith("video"): 
-        return await interaction.response.send_message("❌ Por favor, envie um arquivo de vídeo!")
+@bot.tree.command(name="avaliacao", description="Solicita um teste de PvP")
+async def avaliacao(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    avaliadores_ids = [845105032449884161, 1017444684022427738]
     
-    await interaction.response.defer()
-    v_path, g_path = f"v_{uuid.uuid4()}.mp4", f"g_{uuid.uuid4()}.gif"
-    try:
-        await arquivo.save(v_path)
-        await asyncio.to_thread(converter_video_gif_sync, v_path, g_path)
-        await interaction.followup.send(file=discord.File(g_path))
-    except Exception:
-        await interaction.followup.send("❌ Erro ao converter o vídeo.")
-    finally:
-        for p in (v_path, g_path):
-            if os.path.exists(p): os.remove(p)
+    for aval_id in avaliadores_ids:
+        try:
+            avaliador = await bot.fetch_user(aval_id)
+            # AQUI ESTAVA O ERRO: Certifique-se que é AvaliacaoView
+            view = AvaliacaoView(candidato_id=interaction.user.id)
+            await avaliador.send(content=f"⚔️ **Pedido de Teste:** {interaction.user.mention}", view=view)
+        except Exception as e:
+            print(f"Erro ao enviar DM: {e}")
+
+    await interaction.followup.send("✅ Solicitação enviada aos avaliadores.", ephemeral=True)
 
 # =========================
 # COMANDO: ALLY COM CACHE BREAK (FIXED)
