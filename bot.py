@@ -601,7 +601,7 @@ class SolicitacaoView(discord.ui.View):
 async def avaliacao(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
 
-    avaliadores_ids = [1129212119213146136, 1017444684022427738, 1391712428479352834]
+    avaliadores_ids = [1129212119213146136, 1017444684022427738, 1277257295616540775]
     
     embed_aviso = discord.Embed(
         title="⚔️ Solicitação de Avaliação",
