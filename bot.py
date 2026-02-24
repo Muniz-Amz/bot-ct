@@ -48,6 +48,71 @@ intents.message_content = True
 intents.members = True          
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
+# ==========================================
+# SISTEMA DE AVALIAÇÃO PVP (JANELA E BOTÕES)
+# ==========================================
+
+# 1. A Janela Pop-up (Modal) que o Avaliador vai preencher
+class AvaliacaoModal(discord.ui.Modal, title='Agendar Avaliação PvP'):
+    def __init__(self, candidato_id: int):
+        super().__init__()
+        self.candidato_id = candidato_id
+
+    # Caixa 1: Data e Hora
+    data_hora = discord.ui.TextInput(
+        label='Data e Horário',
+        placeholder='Ex: Amanhã às 20:00',
+        style=discord.TextStyle.short,
+        required=True
+    )
+
+    # Caixa 2: Código da Arena
+    codigo_arena = discord.ui.TextInput(
+        label='Código da Arena (PS)',
+        placeholder='Ex: 12345ABC',
+        style=discord.TextStyle.short,
+        required=True
+    )
+
+    # O que acontece quando o Avaliador clica em "Enviar" na janela:
+    async def on_submit(self, interaction: discord.Interaction):
+        # Busca o membro que pediu a avaliação
+        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
+        
+        if candidato:
+            # Monta o Embed bonitão para a DM do jogador
+            embed_jogador = discord.Embed(
+                title="⚔️ Avaliação PvP Agendada!",
+                description=f"O avaliador {interaction.user.mention} marcou o seu teste de ranking.",
+                color=discord.Color.green()
+            )
+            embed_jogador.add_field(name="📅 Data e Horário", value=f"`{self.data_hora.value}`", inline=False)
+            embed_jogador.add_field(name="🎮 Código da Arena", value=f"`{self.codigo_arena.value}`", inline=False)
+            embed_jogador.set_thumbnail(url=interaction.user.display_avatar.url)
+            embed_jogador.set_footer(text="Celestial Trindade - Prepare-se para a batalha!")
+
+            try:
+                # Envia a DM para o membro
+                await candidato.send(embed=embed_jogador)
+                
+                # Avisa o avaliador que deu tudo certo
+                await interaction.response.send_message(f"✅ O agendamento foi enviado para a DM de {candidato.name} com sucesso!", ephemeral=True)
+            except discord.Forbidden:
+                await interaction.response.send_message(f"❌ O membro {candidato.name} está com a DM bloqueada. Não consegui avisá-lo.", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Erro: Não encontrei o usuário.", ephemeral=True)
+
+# 2. O Botão que vai na DM do Avaliador
+class AvaliacaoView(discord.ui.View):
+    def __init__(self, candidato_id: int):
+        super().__init__(timeout=None)
+        self.candidato_id = candidato_id
+
+    @discord.ui.button(label="📅 Agendar Avaliação", style=discord.ButtonStyle.primary, custom_id="btn_agendar_aval")
+    async def agendar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Quando o avaliador clica no botão, o bot abre a janelinha na tela dele
+        await interaction.response.send_modal(AvaliacaoModal(self.candidato_id))
+
 # =========================
 # Botão Do Rejeitar
 # =========================
@@ -505,6 +570,40 @@ class SolicitacaoView(discord.ui.View):
                 await candidato.send(f"⚠️ **Atenção:** Os líderes verificaram, mas **você ainda não enviou o pedido no grupo do Roblox**.\nPor favor, entre no link, clique em 'Join Group' e faça o comando `/solicitar` novamente.\n🔗 {link_grupo}")
             except: pass
         await interaction.followup.send("⚠️ Você avisou que ele não fez o pedido. Mensagem enviada!", ephemeral=True)
+        
+# ==========================================
+# O COMANDO /AVALIACAO
+# ==========================================
+@bot.tree.command(name="avaliacao", description="Solicita um teste de PvP para subir de Rank")
+async def avaliacao(interaction: discord.Interaction):
+    # Evita que o comando expire no Render
+    await interaction.response.defer(ephemeral=True)
+
+    # O ID do Avaliador que você me passou
+    avaliador_id = 1017444684022427738
+    
+    # Embed que o AVALIADOR vai receber
+    embed_aviso = discord.Embed(
+        title="⚔️ Nova Solicitação de Avaliação",
+        description=f"O membro {interaction.user.mention} (`{interaction.user.name}`) está solicitando um teste de PvP.",
+        color=discord.Color.gold()
+    )
+    embed_aviso.set_thumbnail(url=interaction.user.display_avatar.url)
+    embed_aviso.set_footer(text="Clique no botão abaixo para preencher os dados da arena.")
+
+    try:
+        avaliador = await bot.fetch_user(avaliador_id)
+        if avaliador:
+            # Chama a View do botão, atrelando o ID de quem pediu
+            view = AvaliacaoView(candidato_id=interaction.user.id)
+            
+            # Envia a DM para o Avaliador
+            await avaliador.send(embed=embed_aviso, view=view)
+            
+            # Avisa o membro no chat que o pedido foi enviado
+            await interaction.followup.send("✅ Sua solicitação foi enviada ao Avaliador Oficial! Aguarde, você receberá a data e o código da arena na sua DM.", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Ocorreu um erro ao contatar o avaliador. Verifique se a DM dele está aberta.", ephemeral=True)
 
 # =========================
 # COMANDO /SOLICITAR
@@ -515,7 +614,7 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
     # Avisa o Discord que vai demorar (evita o bot cair no Render)
     await interaction.response.defer()
 
-    adms_ids = [845105032449884161, 1129212119213146136]
+    adms_ids = [845105032449884161, 1129212119213146136, 1017444684022427738]
     cargos_id = [1395092778614132777]
     mencoes = " ".join([f"<@&{id_cargo}>" for id_cargo in cargos_id])
     link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
