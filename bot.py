@@ -19,6 +19,7 @@ import aiohttp
 # =========================
 logging.basicConfig(level=logging.INFO)
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+ID_CANAL_LOG_AVALIACAO = 1475890030135476387
 
 # ==========================
 # SISTEMA KEEP ALIVE (FLASK)
@@ -48,70 +49,92 @@ intents.message_content = True
 intents.members = True          
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
-# ==========================================
-# SISTEMA DE AVALIAÇÃO PVP (JANELA E BOTÕES)
-# ==========================================
+agendados_recentemente = set()
 
-# 1. A Janela Pop-up (Modal) que o Avaliador vai preencher
 class AvaliacaoModal(discord.ui.Modal, title='Agendar Avaliação PvP'):
     def __init__(self, candidato_id: int):
         super().__init__()
         self.candidato_id = candidato_id
 
-    # Caixa 1: Data e Hora
     data_hora = discord.ui.TextInput(
         label='Data e Horário',
-        placeholder='Ex: Amanhã às 20:00',
+        placeholder='Ex: Amanhã às 18:00',
         style=discord.TextStyle.short,
         required=True
     )
 
-    # Caixa 2: Código da Arena
     codigo_arena = discord.ui.TextInput(
         label='Código da Arena (PS)',
-        placeholder='Ex: 12345ABC',
+        placeholder='Ex: ARENA-XYZ',
         style=discord.TextStyle.short,
         required=True
     )
 
-    # O que acontece quando o Avaliador clica em "Enviar" na janela:
     async def on_submit(self, interaction: discord.Interaction):
-        # Busca o membro que pediu a avaliação
         candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
         
         if candidato:
-            # Monta o Embed bonitão para a DM do jogador
+            # Embed para o Jogador
             embed_jogador = discord.Embed(
                 title="⚔️ Avaliação PvP Agendada!",
-                description=f"O avaliador {interaction.user.mention} marcou o seu teste de ranking.",
+                description=f"O avaliador {interaction.user.mention} marcou o seu teste.",
                 color=discord.Color.green()
             )
             embed_jogador.add_field(name="📅 Data e Horário", value=f"`{self.data_hora.value}`", inline=False)
             embed_jogador.add_field(name="🎮 Código da Arena", value=f"`{self.codigo_arena.value}`", inline=False)
-            embed_jogador.set_thumbnail(url=interaction.user.display_avatar.url)
-            embed_jogador.set_footer(text="Celestial Trindade - Prepare-se para a batalha!")
+            embed_jogador.set_footer(text="Celestial Trindade - Esteja pronto!")
+
+            # Embed para o Canal de Log
+            embed_log = discord.Embed(
+                title="📝 Log de Agendamento",
+                color=discord.Color.blue(),
+                timestamp=datetime.now()
+            )
+            embed_log.add_field(name="👤 Candidato", value=f"{candidato.mention} (`{candidato.id}`)", inline=True)
+            embed_log.add_field(name="🛡️ Avaliador", value=f"{interaction.user.mention}", inline=True)
+            embed_log.add_field(name="📅 Marcado para", value=f"{self.data_hora.value}", inline=False)
+            embed_log.add_field(name="🔑 Código", value=f"`{self.codigo_arena.value}`", inline=True)
 
             try:
-                # Envia a DM para o membro
+                # 1. Envia para o Candidato
                 await candidato.send(embed=embed_jogador)
                 
-                # Avisa o avaliador que deu tudo certo
-                await interaction.response.send_message(f"✅ O agendamento foi enviado para a DM de {candidato.name} com sucesso!", ephemeral=True)
-            except discord.Forbidden:
-                await interaction.response.send_message(f"❌ O membro {candidato.name} está com a DM bloqueada. Não consegui avisá-lo.", ephemeral=True)
-        else:
-            await interaction.response.send_message("❌ Erro: Não encontrei o usuário.", ephemeral=True)
+                # 2. Ativa a trava
+                agendados_recentemente.add(self.candidato_id)
+                
+                # 3. Envia para o Canal de Log
+                canal_log = interaction.client.get_channel(ID_CANAL_LOG_AVALIACAO)
+                if canal_log:
+                    await canal_log.send(embed=embed_log)
+                
+                # 4. Responde ao Avaliador e trava o botão original
+                await interaction.response.send_message(f"✅ Sucesso! Agendamento registrado e enviado para {candidato.name}.", ephemeral=True)
+                
+                if interaction.message:
+                    view = discord.ui.View.from_message(interaction.message)
+                    for item in view.children:
+                        item.disabled = True
+                    await interaction.message.edit(view=view)
 
-# 2. O Botão que vai na DM do Avaliador
+            except discord.Forbidden:
+                await interaction.response.send_message(f"❌ Não consegui enviar DM para o candidato (DM fechada).", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Usuário não encontrado.", ephemeral=True)
+
 class AvaliacaoView(discord.ui.View):
     def __init__(self, candidato_id: int):
         super().__init__(timeout=None)
         self.candidato_id = candidato_id
 
-    @discord.ui.button(label="📅 Agendar Avaliação", style=discord.ButtonStyle.primary, custom_id="btn_agendar_aval")
+    @discord.ui.button(label="📅 Agendar Teste", style=discord.ButtonStyle.primary, custom_id="btn_agendar_pvp")
     async def agendar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Quando o avaliador clica no botão, o bot abre a janelinha na tela dele
-        await interaction.response.send_modal(AvaliacaoModal(self.candidato_id))
+        if self.candidato_id in agendados_recentemente:
+            button.disabled = True
+            button.label = "✅ Já Agendado"
+            await interaction.response.edit_message(view=self)
+            return await interaction.followup.send("⚠️ Outro avaliador já marcou este teste!", ephemeral=True)
+
+        await interaction.response.send_modal(AvaliacaoModal(candidato_id=self.candidato_id))
 
 # =========================
 # Botão Do Rejeitar
@@ -571,39 +594,36 @@ class SolicitacaoView(discord.ui.View):
             except: pass
         await interaction.followup.send("⚠️ Você avisou que ele não fez o pedido. Mensagem enviada!", ephemeral=True)
 
-# ==========================================
-# O COMANDO /AVALIACAO
-# ==========================================
-@bot.tree.command(name="avaliacao", description="Solicita um teste de PvP para subir de Rank")
+# =========================
+# COMANDO /AVALIACAO
+# =========================
+@bot.tree.command(name="avaliacao", description="Solicita um teste de PvP")
 async def avaliacao(interaction: discord.Interaction):
-    # Evita que o comando expire no Render
     await interaction.response.defer(ephemeral=True)
 
-    # O ID do Avaliador que você me passou
-    avaliador_id = [845105032449884161, 1017444684022427738]
+    avaliadores_ids = [1129212119213146136, 1017444684022427738, 1391712428479352834]
     
-    # Embed que o AVALIADOR vai receber
     embed_aviso = discord.Embed(
-        title="⚔️ Nova Solicitação de Avaliação",
-        description=f"O membro {interaction.user.mention} (`{interaction.user.name}`) está solicitando um teste de PvP.",
+        title="⚔️ Solicitação de Avaliação",
+        description=f"O membro {interaction.user.mention} quer um teste de PvP.",
         color=discord.Color.gold()
     )
-    embed_aviso.set_thumbnail(url=interaction.user.display_avatar.url)
-    embed_aviso.set_footer(text="Clique no botão abaixo para preencher os dados da arena.")
+    embed_aviso.set_footer(text="Apenas o primeiro avaliador a clicar poderá agendar.")
 
-    try:
-        avaliador = await bot.fetch_user(avaliador_id)
-        if avaliador:
-            # Chama a View do botão, atrelando o ID de quem pediu
-            view = AvaliacaoView(candidato_id=interaction.user.id)
-            
-            # Envia a DM para o Avaliador
-            await avaliador.send(embed=embed_aviso, view=view)
-            
-            # Avisa o membro no chat que o pedido foi enviado
-            await interaction.followup.send("✅ Sua solicitação foi enviada ao Avaliador Oficial! Aguarde, você receberá a data e o código da arena na sua DM.", ephemeral=True)
-    except Exception as e:
-        await interaction.followup.send(f"❌ Ocorreu um erro ao contatar o avaliador. Verifique se a DM dele está aberta.", ephemeral=True)
+    sucesso = False
+    for aval_id in avaliadores_ids:
+        try:
+            avaliador = await bot.fetch_user(aval_id)
+            if avaliador:
+                view = AvaliacaoView(candidato_id=interaction.user.id)
+                await avaliador.send(embed=embed_aviso, view=view)
+                sucesso = True
+        except: continue
+
+    if sucesso:
+        await interaction.followup.send("✅ Pedido enviado! Aguarde o contato na sua DM.", ephemeral=True)
+    else:
+        await interaction.followup.send("❌ Erro ao contatar avaliadores.", ephemeral=True)
 
 # =========================
 # COMANDO /SOLICITAR
