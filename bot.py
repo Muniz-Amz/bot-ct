@@ -48,6 +48,10 @@ intents.message_content = True
 intents.members = True          
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
+
+# Lista para evitar que dois avaliadores respondam ao mesmo tempo
+agendados_recentemente = []
+
 # ==========================================
 # SISTEMA DE AVALIAÇÃO PVP (MODAL E BOTÕES)
 # ==========================================
@@ -72,26 +76,36 @@ class AvaliacaoModal(discord.ui.Modal, title='Agendar Avaliação PvP'):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        # --- TRAVA DE SEGURANÇA ---
+        if self.candidato_id in agendados_recentemente:
+            return await interaction.response.send_message("❌ Outro avaliador já agendou este teste!", ephemeral=True)
+
         candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
         
         if candidato:
+            agendados_recentemente.append(self.candidato_id) # Bloqueia outros
+            
             embed_jogador = discord.Embed(
                 title="⚔️ Avaliação PvP Agendada!",
-                description=f"Um avaliador marcou o seu teste de ranking.",
+                description=f"O avaliador {interaction.user.mention} marcou o seu teste de ranking.",
                 color=discord.Color.green()
             )
             embed_jogador.add_field(name="📅 Data e Horário", value=f"`{self.data_hora.value}`", inline=False)
             embed_jogador.add_field(name="🎮 Código da Arena", value=f"`{self.codigo_arena.value}`", inline=False)
             embed_jogador.set_thumbnail(url=candidato.display_avatar.url)
-            embed_jogador.set_footer(text="Celestial Trindade - Boa sorte no teste!")
+            embed_jogador.set_footer(text="Celestial Trindade - Prepare-se!")
 
             try:
                 await candidato.send(embed=embed_jogador)
-                # Desativa os botões da mensagem do avaliador para evitar duplo agendamento
-                for item in self.children: item.disabled = True
                 await interaction.response.send_message(f"✅ Agendamento enviado para {candidato.name}!", ephemeral=True)
+                
+                # Limpa o cache após 30 minutos para permitir novos pedidos no futuro
+                await asyncio.sleep(1800)
+                if self.candidato_id in agendados_recentemente:
+                    agendados_recentemente.remove(self.candidato_id)
             except discord.Forbidden:
                 await interaction.response.send_message(f"❌ O membro está com a DM fechada.", ephemeral=True)
+                if self.candidato_id in agendados_recentemente: agendados_recentemente.remove(self.candidato_id)
 
 class AvaliacaoView(discord.ui.View):
     def __init__(self, candidato_id: int):
@@ -100,6 +114,10 @@ class AvaliacaoView(discord.ui.View):
 
     @discord.ui.button(label="📅 Agendar Avaliação", style=discord.ButtonStyle.primary)
     async def agendar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Verifica se já foi agendado antes mesmo de abrir o formulário
+        if self.candidato_id in agendados_recentemente:
+            return await interaction.response.send_message("❌ Este teste já foi agendado por outro avaliador.", ephemeral=True)
+        
         await interaction.response.send_modal(AvaliacaoModal(self.candidato_id))
 # =========================
 # Botão Do Rejeitar
