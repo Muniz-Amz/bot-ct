@@ -20,7 +20,15 @@ import aiohttp
 logging.basicConfig(level=logging.INFO)
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 ID_CANAL_LOG_AVALIACAO = 1475890030135476387
-
+# Dicionário de Ranks para consulta do Bot
+RANKS_PVP = {
+    "ARCANJO": 1434373467104481300,
+    "SERAFIM": 1299983374047252560,
+    "QUERUBIM": 1317543532910612541,
+    "DIVINDADE": 1314695358294790244,
+    "ANJO": 1317557856077348905,
+    "HEREGE": 1434428766435938416
+}
 # ==========================
 # SISTEMA KEEP ALIVE (FLASK)
 # ==========================
@@ -51,16 +59,24 @@ bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 agendados_recentemente = set()
 
-class AvaliacaoModal(discord.ui.Modal, title='Agendar Avaliação PvP'):
+class AvaliacaoModal(discord.ui.Modal, title='Gerenciar Avaliação PvP'):
     def __init__(self, candidato_id: int):
         super().__init__()
         self.candidato_id = candidato_id
 
     data_hora = discord.ui.TextInput(
         label='Data e Horário',
-        placeholder='Ex: Amanhã às 18:00',
+        placeholder='Ex: Amanhã às 18:00 / Já finalizado',
         style=discord.TextStyle.short,
         required=True
+    )
+
+    # NOVO CAMPO PARA O CARGO
+    rank_conquistado = discord.ui.TextInput(
+        label='Rank Conquistado (Opcional)',
+        placeholder='Escreva: Anjo, Serafim, Querubim...',
+        style=discord.TextStyle.short,
+        required=False
     )
 
     codigo_arena = discord.ui.TextInput(
@@ -71,71 +87,88 @@ class AvaliacaoModal(discord.ui.Modal, title='Agendar Avaliação PvP'):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
+        guild = interaction.guild
+        membro = guild.get_member(self.candidato_id) or await guild.fetch_member(self.candidato_id)
         
-        if candidato:
-            # Embed para o Jogador
-            embed_jogador = discord.Embed(
-                title="⚔️ Avaliação PvP Agendada!",
-                description=f"O avaliador {interaction.user.mention} marcou o seu teste.",
-                color=discord.Color.green()
-            )
-            embed_jogador.add_field(name="📅 Data e Horário", value=f"`{self.data_hora.value}`", inline=False)
-            embed_jogador.add_field(name="🎮 Código da Arena", value=f"`{self.codigo_arena.value}`", inline=False)
-            embed_jogador.set_footer(text="Celestial Trindade - Esteja pronto!")
+        if not membro:
+            return await interaction.response.send_message("❌ Usuário não encontrado no servidor.", ephemeral=True)
 
-            # Embed para o Canal de Log
-            embed_log = discord.Embed(
-                title="📝 Log de Agendamento",
-                color=discord.Color.blue(),
-                timestamp=datetime.now()
-            )
-            embed_log.add_field(name="👤 Candidato", value=f"{candidato.mention} (`{candidato.id}`)", inline=True)
-            embed_log.add_field(name="🛡️ Avaliador", value=f"{interaction.user.mention}", inline=True)
-            embed_log.add_field(name="📅 Marcado para", value=f"{self.data_hora.value}", inline=False)
-            embed_log.add_field(name="🔑 Código", value=f"`{self.codigo_arena.value}`", inline=True)
+        rank_texto = self.rank_conquistado.value.upper().strip()
+        cargo_nome_log = "Nenhum (Apenas Agendado)"
+        
+        # --- LÓGICA DE ATRIBUIÇÃO DE CARGO ---
+        if rank_texto in RANKS_PVP:
+            id_cargo = RANKS_PVP[rank_texto]
+            cargo_obj = guild.get_role(id_cargo)
+            
+            if cargo_obj:
+                # Remove ranks antigos para não acumular cargos
+                cargos_atuais = [guild.get_role(rid) for rname, rid in RANKS_PVP.items() if guild.get_role(rid) in membro.roles]
+                if cargos_atuais:
+                    await membro.remove_roles(*cargos_atuais)
+                
+                # Adiciona o novo rank
+                await membro.add_roles(cargo_obj)
+                cargo_nome_log = cargo_obj.name
 
-            try:
-                # 1. Envia para o Candidato
-                await candidato.send(embed=embed_jogador)
-                
-                # 2. Ativa a trava
-                agendados_recentemente.add(self.candidato_id)
-                
-                # 3. Envia para o Canal de Log
-                canal_log = interaction.client.get_channel(ID_CANAL_LOG_AVALIACAO)
-                if canal_log:
-                    await canal_log.send(embed=embed_log)
-                
-                # 4. Responde ao Avaliador e trava o botão original
-                await interaction.response.send_message(f"✅ Sucesso! Agendamento registrado e enviado para {candidato.name}.", ephemeral=True)
-                
-                if interaction.message:
-                    view = discord.ui.View.from_message(interaction.message)
-                    for item in view.children:
-                        item.disabled = True
-                    await interaction.message.edit(view=view)
+        # --- PREPARAÇÃO DOS EMBEDS ---
+        embed_jogador = discord.Embed(
+            title="⚔️ Atualização de Avaliação PvP",
+            description=f"O avaliador {interaction.user.mention} processou seu teste.",
+            color=discord.Color.green()
+        )
+        embed_jogador.add_field(name="📅 Info", value=f"`{self.data_hora.value}`", inline=False)
+        embed_jogador.add_field(name="🎮 Arena", value=f"`{self.codigo_arena.value}`", inline=False)
+        if rank_texto in RANKS_PVP:
+            embed_jogador.add_field(name="🏆 Novo Rank", value=f"**{cargo_nome_log}**", inline=False)
 
-            except discord.Forbidden:
-                await interaction.response.send_message(f"❌ Não consegui enviar DM para o candidato (DM fechada).", ephemeral=True)
-        else:
-            await interaction.response.send_message("❌ Usuário não encontrado.", ephemeral=True)
+        embed_log = discord.Embed(
+            title="📝 Log de Hierarquia PvP",
+            color=discord.Color.blue(),
+            timestamp=datetime.now()
+        )
+        embed_log.add_field(name="👤 Candidato", value=f"{membro.mention}", inline=True)
+        embed_log.add_field(name="🛡️ Avaliador", value=f"{interaction.user.mention}", inline=True)
+        embed_log.add_field(name="📈 Resultado", value=f"**{cargo_nome_log}**", inline=False)
+
+        try:
+            # 1. Envia para o Candidato
+            await membro.send(embed=embed_jogador)
+            
+            # 2. Ativa a trava
+            agendados_recentemente.add(self.candidato_id)
+            
+            # 3. Envia para o Canal de Log
+            canal_log = interaction.client.get_channel(ID_CANAL_LOG_AVALIACAO)
+            if canal_log:
+                await canal_log.send(embed=embed_log)
+            
+            # 4. Responde ao Avaliador e trava o botão
+            await interaction.response.send_message(f"✅ Sucesso! Rank {cargo_nome_log} aplicado a {membro.name}.", ephemeral=True)
+            
+            if interaction.message:
+                view = discord.ui.View.from_message(interaction.message)
+                for item in view.children:
+                    item.disabled = True
+                await interaction.message.edit(view=view)
+
+        except discord.Forbidden:
+            await interaction.response.send_message(f"⚠️ Rank atualizado, mas a DM do membro está fechada.", ephemeral=True)
 
 class AvaliacaoView(discord.ui.View):
     def __init__(self, candidato_id: int):
         super().__init__(timeout=None)
         self.candidato_id = candidato_id
 
-    @discord.ui.button(label="📅 Agendar Teste", style=discord.ButtonStyle.primary, custom_id="btn_agendar_pvp")
+    @discord.ui.button(label="⚔️ Avaliar / Agendar", style=discord.ButtonStyle.primary, custom_id="btn_agendar_pvp")
     async def agendar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.candidato_id in agendados_recentemente:
             button.disabled = True
-            button.label = "✅ Já Agendado"
+            button.label = "✅ Já Processado"
             await interaction.response.edit_message(view=self)
-            return await interaction.followup.send("⚠️ Outro avaliador já marcou este teste!", ephemeral=True)
+            return await interaction.followup.send("⚠️ Este teste já foi gerenciado por outro avaliador!", ephemeral=True)
 
         await interaction.response.send_modal(AvaliacaoModal(candidato_id=self.candidato_id))
-
 # =========================
 # Botão Do Rejeitar
 # =========================
@@ -599,31 +632,40 @@ class SolicitacaoView(discord.ui.View):
 # =========================
 @bot.tree.command(name="avaliacao", description="Solicita um teste de PvP")
 async def avaliacao(interaction: discord.Interaction):
+    # Defer com ephemeral=True para que apenas o jogador veja a confirmação
     await interaction.response.defer(ephemeral=True)
 
+    # Lista de IDs dos seus avaliadores
     avaliadores_ids = [1129212119213146136, 1017444684022427738, 1277257295616540775]
     
     embed_aviso = discord.Embed(
         title="⚔️ Solicitação de Avaliação",
-        description=f"O membro {interaction.user.mention} quer um teste de PvP.",
+        description=f"O membro {interaction.user.mention} (`{interaction.user.name}`) deseja um teste de PvP.",
         color=discord.Color.gold()
     )
-    embed_aviso.set_footer(text="Apenas o primeiro avaliador a clicar poderá agendar.")
+    embed_aviso.set_thumbnail(url=interaction.user.display_avatar.url)
+    embed_aviso.set_footer(text="Clique no botão abaixo para agendar a arena ou definir o Rank.")
 
     sucesso = False
     for aval_id in avaliadores_ids:
         try:
+            # Usamos fetch_user para garantir que o bot encontre o avaliador mesmo fora do cache
             avaliador = await bot.fetch_user(aval_id)
             if avaliador:
+                # Criamos a View passando o ID do candidato
                 view = AvaliacaoView(candidato_id=interaction.user.id)
                 await avaliador.send(embed=embed_aviso, view=view)
                 sucesso = True
-        except: continue
+                # Pequena pausa para não ser bloqueado pelo Discord (Rate Limit)
+                await asyncio.sleep(0.3) 
+        except Exception as e:
+            print(f"Erro ao enviar para {aval_id}: {e}")
+            continue
 
     if sucesso:
-        await interaction.followup.send("✅ Pedido enviado! Aguarde o contato na sua DM.", ephemeral=True)
+        await interaction.followup.send("✅ Sua solicitação foi enviada aos Avaliadores! Aguarde o retorno na sua DM.", ephemeral=True)
     else:
-        await interaction.followup.send("❌ Erro ao contatar avaliadores.", ephemeral=True)
+        await interaction.followup.send("❌ Não foi possível avisar os avaliadores. Verifique se as DMs deles estão abertas.", ephemeral=True)
 
 # =========================
 # COMANDO /SOLICITAR
