@@ -138,6 +138,14 @@ class ResultadoModal(discord.ui.Modal, title='Definir Resultado'):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        # --- BLOQUEIO DE SEGURANÇA ---
+        # Verifica se enquanto o avaliador preenchia o modal, outro já terminou o processo
+        if self.candidato_id in avaliados_recentemente:
+            return await interaction.response.send_message(
+                "⚠️ **CONFLITO:** Outro avaliador já registrou o resultado para este jogador enquanto você preenchia o formulário.", 
+                ephemeral=True
+            )
+
         # ESSENCIAL: Avisa ao Discord que o bot está trabalhando (evita timeout de 3s)
         await interaction.response.defer(ephemeral=True)
         
@@ -145,56 +153,82 @@ class ResultadoModal(discord.ui.Modal, title='Definir Resultado'):
         guild = interaction.client.get_guild(ID_DO_SERVIDOR)
         
         try:
+            # Tenta pegar o membro do cache ou buscar no servidor
             membro = guild.get_member(self.candidato_id) or await guild.fetch_member(self.candidato_id)
-        except:
-            return await interaction.followup.send("❌ Membro não encontrado.")
+        except Exception as e:
+            return await interaction.followup.send(f"❌ Erro ao localizar membro: {e}")
 
         rank_texto = self.rank_conquistado.value.upper().strip()
 
         if rank_texto in RANKS_PVP:
             id_cargo = RANKS_PVP[rank_texto]
             cargo_obj = guild.get_role(id_cargo)
+            
             if cargo_obj:
                 try:
-                    # Remove ranks antigos e adiciona o novo
-                    cargos_atuais = [guild.get_role(rid) for rname, rid in RANKS_PVP.items() if guild.get_role(rid) in membro.roles]
+                    # Coleta todos os cargos de rank que o membro possui atualmente para remoção
+                    cargos_atuais = [
+                        guild.get_role(rid) for rname, rid in RANKS_PVP.items() 
+                        if guild.get_role(rid) in membro.roles
+                    ]
+                    
                     if cargos_atuais:
                         await membro.remove_roles(*cargos_atuais)
+                    
+                    # Adiciona o novo cargo conquistado
                     await membro.add_roles(cargo_obj)
                     
-                    # Log e DM
+                    # Log detalhado no canal de logs
                     canal_log = interaction.client.get_channel(ID_CANAL_LOG_AVALIACAO)
                     if canal_log:
-                        await canal_log.send(f"🏆 **{membro.name}** subiu para **{cargo_obj.name}** (Avaliado por {interaction.user.mention})")
+                        embed_log = discord.Embed(
+                            title="🏆 Resultado de Avaliação PvP",
+                            color=discord.Color.green(),
+                            timestamp=datetime.now()
+                        )
+                        embed_log.add_field(name="👤 Jogador", value=f"{membro.mention} (`{membro.id}`)", inline=True)
+                        embed_log.add_field(name="🛡️ Avaliador", value=f"{interaction.user.mention}", inline=True)
+                        embed_log.add_field(name="📈 Novo Rank", value=f"**{cargo_obj.name}**", inline=False)
+                        await canal_log.send(embed=embed_log)
                     
+                    # Tenta avisar o jogador no privado (DM)
                     try:
-                        await membro.send(f"🏆 Seu novo rank na Celestial Trindade é: **{cargo_obj.name}**!")
-                    except:
-                        pass
+                        await membro.send(f"🏆 Parabéns! Seu novo rank na **Celestial Trindade** é: **{cargo_obj.name}**!")
+                    except discord.Forbidden:
+                        print(f"Não foi possível enviar DM para {membro.name}")
                     
+                    # --- FINALIZAÇÃO DA TRAVA ---
+                    # Adiciona o ID ao set apenas após o sucesso da operação
                     avaliados_recentemente.add(self.candidato_id)
-                    await interaction.followup.send(f"✅ Sucesso! {membro.name} agora é {cargo_obj.name}.")
+                    
+                    await interaction.followup.send(f"✅ Sucesso! O jogador {membro.name} foi atualizado para {cargo_obj.name}.")
+                
                 except discord.Forbidden:
-                    await interaction.followup.send("❌ Erro de Permissão: Coloque o cargo do bot no topo da lista!")
+                    await interaction.followup.send("❌ Erro de Permissão: O cargo do bot deve estar ACIMA dos cargos de Rank na hierarquia do servidor.")
+                except Exception as e:
+                    await interaction.followup.send(f"❌ Ocorreu um erro inesperado: {e}")
+            else:
+                await interaction.followup.send("❌ Erro: Cargo não encontrado no servidor (ID inválido).")
         else:
-            await interaction.followup.send(f"❌ Rank `{rank_texto}` não encontrado.")
-
+            await interaction.followup.send(f"❌ O rank `{rank_texto}` não foi reconhecido. Verifique a ortografia.")
 # ------------------------------------------
 # A VIEW COM OS DOIS BOTÕES
 # ------------------------------------------
 class AvaliacaoView(discord.ui.View):
     def __init__(self, candidato_id: int):
-        super().__init__(timeout=None) # Painel nunca expira
+        super().__init__(timeout=None) 
         self.candidato_id = candidato_id
 
     @discord.ui.button(label="📅 1. Agendar Arena", style=discord.ButtonStyle.primary, custom_id="btn_agendar")
     async def agendar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Abre o modal. Cada abertura reseta o tempo do Discord.
+        # TRAVA: Se o ID já estiver nos agendados, barra o segundo avaliador na hora
+        if self.candidato_id in agendados_recentemente:
+            return await interaction.response.send_message("⚠️ Outro avaliador já assumiu esta arena!", ephemeral=True)
+            
         await interaction.response.send_modal(AgendarModal(candidato_id=self.candidato_id))
 
     @discord.ui.button(label="🏆 2. Definir Resultado", style=discord.ButtonStyle.success, custom_id="btn_resultado")
     async def resultado(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Não importa se a luta demorou 1 hora, este clique inicia uma nova interação.
         if self.candidato_id in avaliados_recentemente:
             return await interaction.response.send_message("⚠️ Este resultado já foi registrado!", ephemeral=True)
         
