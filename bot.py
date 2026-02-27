@@ -753,5 +753,15 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
         except Exception as e:
             print(f"❌ Não consegui enviar DM para o admin {adm_id}: {e}")
 
+# COMANDO PARA SINCRONIZAR OS SLASH COMMANDS (/)
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def deploy(ctx):
+    await ctx.send("🚀 Sincronizando comandos... Aguarde um momento.")
+    try:
+        synced = await bot.tree.sync()
+        await ctx.send(f"✅ Sucesso! {len(synced)} comandos sincronizados.")
+    except Exception as e:
+        await ctx.send(f"❌ Erro ao sincronizar: {e}")
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
