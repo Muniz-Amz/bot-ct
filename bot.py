@@ -20,6 +20,7 @@ import aiohttp
 logging.basicConfig(level=logging.INFO)
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 ID_CANAL_LOG_AVALIACAO = 1475890030135476387
+
 # Dicionário de Ranks para consulta do Bot
 RANKS_PVP = {
     "ARCANJO": 1434373467104481300,
@@ -57,26 +58,23 @@ intents.message_content = True
 intents.members = True          
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
+# Travas independentes
 agendados_recentemente = set()
+avaliados_recentemente = set()
 
-class AvaliacaoModal(discord.ui.Modal, title='Gerenciar Avaliação PvP'):
+# ------------------------------------------
+# MODAL 1: APENAS PARA AGENDAR A LUTA
+# ------------------------------------------
+class AgendarModal(discord.ui.Modal, title='Agendar Arena'):
     def __init__(self, candidato_id: int):
         super().__init__()
         self.candidato_id = candidato_id
 
     data_hora = discord.ui.TextInput(
         label='Data e Horário',
-        placeholder='Ex: Amanhã às 18:00 / Já finalizado',
+        placeholder='Ex: Hoje às 18:00',
         style=discord.TextStyle.short,
         required=True
-    )
-
-    # NOVO CAMPO PARA O CARGO
-    rank_conquistado = discord.ui.TextInput(
-        label='Rank Conquistado (Opcional)',
-        placeholder='Escreva: Anjo, Serafim, Querubim...',
-        style=discord.TextStyle.short,
-        required=False
     )
 
     codigo_arena = discord.ui.TextInput(
@@ -87,88 +85,134 @@ class AvaliacaoModal(discord.ui.Modal, title='Gerenciar Avaliação PvP'):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        guild = interaction.guild
-        membro = guild.get_member(self.candidato_id) or await guild.fetch_member(self.candidato_id)
+        ID_DO_SERVIDOR = 1295495463595802765
+        guild = interaction.client.get_guild(ID_DO_SERVIDOR)
         
-        if not membro:
-            return await interaction.response.send_message("❌ Usuário não encontrado no servidor.", ephemeral=True)
+        if not guild:
+            return await interaction.response.send_message("❌ Erro: Servidor não encontrado.", ephemeral=True)
+
+        try:
+            membro = guild.get_member(self.candidato_id) or await guild.fetch_member(self.candidato_id)
+        except:
+            return await interaction.response.send_message("❌ Membro não encontrado no servidor.", ephemeral=True)
+
+        # Log de Agendamento
+        canal_log = interaction.client.get_channel(ID_CANAL_LOG_AVALIACAO)
+        if canal_log:
+            embed_log = discord.Embed(title="📅 Log de Agendamento PvP", color=discord.Color.blue(), timestamp=datetime.now())
+            embed_log.add_field(name="👤 Candidato", value=f"{membro.mention}", inline=True)
+            embed_log.add_field(name="🛡️ Avaliador", value=f"{interaction.user.mention}", inline=True)
+            embed_log.add_field(name="⏰ Marcado para", value=f"`{self.data_hora.value}`", inline=False)
+            embed_log.add_field(name="🔑 Arena", value=f"`{self.codigo_arena.value}`", inline=False)
+            await canal_log.send(embed=embed_log)
+
+        # DM para o Jogador
+        try:
+            embed_jogador = discord.Embed(title="⚔️ Teste PvP Agendado!", color=discord.Color.blue())
+            embed_jogador.description = f"Seu teste foi marcado pelo avaliador {interaction.user.mention}."
+            embed_jogador.add_field(name="📅 Horário", value=f"`{self.data_hora.value}`", inline=False)
+            embed_jogador.add_field(name="🎮 Arena", value=f"`{self.codigo_arena.value}`", inline=False)
+            embed_jogador.set_footer(text="Prepare-se para a batalha!")
+            await membro.send(embed=embed_jogador)
+            
+            agendados_recentemente.add(self.candidato_id)
+            await interaction.response.send_message(f"✅ Arena marcada e enviada para {membro.name}.", ephemeral=True)
+            
+            # Desativa apenas o botão de agendar na DM do avaliador
+            if interaction.message:
+                view = discord.ui.View.from_message(interaction.message)
+                view.children[0].disabled = True # Desativa o 1º botão
+                await interaction.message.edit(view=view)
+        except:
+            await interaction.response.send_message(f"✅ Agendado, mas a DM do membro está fechada.", ephemeral=True)
+
+
+# ------------------------------------------
+# MODAL 2: APENAS PARA DAR O RESULTADO/CARGO
+# ------------------------------------------
+class ResultadoModal(discord.ui.Modal, title='Definir Resultado'):
+    def __init__(self, candidato_id: int):
+        super().__init__()
+        self.candidato_id = candidato_id
+
+    rank_conquistado = discord.ui.TextInput(
+        label='Rank Conquistado',
+        placeholder='Ex: Anjo, Serafim, Querubim...',
+        style=discord.TextStyle.short,
+        required=True
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        ID_DO_SERVIDOR = 1295495463595802765
+        guild = interaction.client.get_guild(ID_DO_SERVIDOR)
+        
+        try:
+            membro = guild.get_member(self.candidato_id) or await guild.fetch_member(self.candidato_id)
+        except:
+            return await interaction.response.send_message("❌ Membro não encontrado no servidor.", ephemeral=True)
 
         rank_texto = self.rank_conquistado.value.upper().strip()
-        cargo_nome_log = "Nenhum (Apenas Agendado)"
-        
-        # --- LÓGICA DE ATRIBUIÇÃO DE CARGO ---
+        cargo_nome_log = "Rank Inválido"
+
         if rank_texto in RANKS_PVP:
             id_cargo = RANKS_PVP[rank_texto]
             cargo_obj = guild.get_role(id_cargo)
-            
             if cargo_obj:
-                # Remove ranks antigos para não acumular cargos
                 cargos_atuais = [guild.get_role(rid) for rname, rid in RANKS_PVP.items() if guild.get_role(rid) in membro.roles]
                 if cargos_atuais:
                     await membro.remove_roles(*cargos_atuais)
-                
-                # Adiciona o novo rank
                 await membro.add_roles(cargo_obj)
                 cargo_nome_log = cargo_obj.name
+        else:
+            return await interaction.response.send_message("❌ Nome de Rank não reconhecido. Use: Anjo, Serafim, etc.", ephemeral=True)
 
-        # --- PREPARAÇÃO DOS EMBEDS ---
-        embed_jogador = discord.Embed(
-            title="⚔️ Atualização de Avaliação PvP",
-            description=f"O avaliador {interaction.user.mention} processou seu teste.",
-            color=discord.Color.green()
-        )
-        embed_jogador.add_field(name="📅 Info", value=f"`{self.data_hora.value}`", inline=False)
-        embed_jogador.add_field(name="🎮 Arena", value=f"`{self.codigo_arena.value}`", inline=False)
-        if rank_texto in RANKS_PVP:
-            embed_jogador.add_field(name="🏆 Novo Rank", value=f"**{cargo_nome_log}**", inline=False)
+        # Log Final
+        canal_log = interaction.client.get_channel(ID_CANAL_LOG_AVALIACAO)
+        if canal_log:
+            embed_log = discord.Embed(title="🏆 Log de Resultado PvP", color=discord.Color.green(), timestamp=datetime.now())
+            embed_log.add_field(name="👤 Jogador", value=f"{membro.mention}", inline=True)
+            embed_log.add_field(name="🛡️ Avaliado por", value=f"{interaction.user.mention}", inline=True)
+            embed_log.add_field(name="📈 Novo Rank", value=f"**{cargo_nome_log}**", inline=False)
+            await canal_log.send(embed=embed_log)
 
-        embed_log = discord.Embed(
-            title="📝 Log de Hierarquia PvP",
-            color=discord.Color.blue(),
-            timestamp=datetime.now()
-        )
-        embed_log.add_field(name="👤 Candidato", value=f"{membro.mention}", inline=True)
-        embed_log.add_field(name="🛡️ Avaliador", value=f"{interaction.user.mention}", inline=True)
-        embed_log.add_field(name="📈 Resultado", value=f"**{cargo_nome_log}**", inline=False)
-
+        # DM Final para o Jogador
         try:
-            # 1. Envia para o Candidato
+            embed_jogador = discord.Embed(title="🏆 Resultado da Avaliação PvP", color=discord.Color.green())
+            embed_jogador.description = f"Parabéns! O avaliador {interaction.user.mention} definiu seu novo rank."
+            embed_jogador.add_field(name="🏅 Rank Conquistado", value=f"**{cargo_nome_log}**", inline=False)
             await membro.send(embed=embed_jogador)
             
-            # 2. Ativa a trava
-            agendados_recentemente.add(self.candidato_id)
+            avaliados_recentemente.add(self.candidato_id)
+            await interaction.response.send_message(f"✅ Sucesso! O jogador subiu para {cargo_nome_log}.", ephemeral=True)
             
-            # 3. Envia para o Canal de Log
-            canal_log = interaction.client.get_channel(ID_CANAL_LOG_AVALIACAO)
-            if canal_log:
-                await canal_log.send(embed=embed_log)
-            
-            # 4. Responde ao Avaliador e trava o botão
-            await interaction.response.send_message(f"✅ Sucesso! Rank {cargo_nome_log} aplicado a {membro.name}.", ephemeral=True)
-            
+            # Desativa o botão de resultado
             if interaction.message:
                 view = discord.ui.View.from_message(interaction.message)
-                for item in view.children:
-                    item.disabled = True
+                view.children[1].disabled = True # Desativa o 2º botão
                 await interaction.message.edit(view=view)
+        except:
+            await interaction.response.send_message(f"✅ Rank atualizado no servidor, mas a DM do membro está fechada.", ephemeral=True)
 
-        except discord.Forbidden:
-            await interaction.response.send_message(f"⚠️ Rank atualizado, mas a DM do membro está fechada.", ephemeral=True)
-
+# ------------------------------------------
+# A VIEW COM OS DOIS BOTÕES
+# ------------------------------------------
 class AvaliacaoView(discord.ui.View):
     def __init__(self, candidato_id: int):
         super().__init__(timeout=None)
         self.candidato_id = candidato_id
 
-    @discord.ui.button(label="⚔️ Avaliar / Agendar", style=discord.ButtonStyle.primary, custom_id="btn_agendar_pvp")
+    @discord.ui.button(label="📅 1. Agendar Arena", style=discord.ButtonStyle.primary, custom_id="btn_agendar")
     async def agendar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.candidato_id in agendados_recentemente:
-            button.disabled = True
-            button.label = "✅ Já Processado"
-            await interaction.response.edit_message(view=self)
-            return await interaction.followup.send("⚠️ Este teste já foi gerenciado por outro avaliador!", ephemeral=True)
+            return await interaction.response.send_message("⚠️ Outro avaliador já agendou esta luta!", ephemeral=True)
+        await interaction.response.send_modal(AgendarModal(candidato_id=self.candidato_id))
 
-        await interaction.response.send_modal(AvaliacaoModal(candidato_id=self.candidato_id))
+    @discord.ui.button(label="🏆 2. Definir Resultado", style=discord.ButtonStyle.success, custom_id="btn_resultado")
+    async def resultado(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.candidato_id in avaliados_recentemente:
+            return await interaction.response.send_message("⚠️ O resultado deste jogador já foi registrado!", ephemeral=True)
+        await interaction.response.send_modal(ResultadoModal(candidato_id=self.candidato_id))
+
 # =========================
 # Botão Do Rejeitar
 # =========================
