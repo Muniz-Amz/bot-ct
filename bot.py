@@ -401,61 +401,45 @@ async def on_member_join(member):
             pass
         
 @bot.event
+async def on_ready():
+    print(f"✅ Bot logado como {bot.user}")
+    print("👉 Use !deploy no Discord para atualizar os comandos Slash.")
+
+@bot.event
 async def on_member_join(member):
-    # --- CONFIGURAÇÕES ---
-    LINK_GRUPO_ROBLOX = "https://www.roblox.com/groups/SEU_ID_AQUI"
-    LINK_SERVIDOR_DISCORD = "https://discord.gg/SEU_CONVITE"
-    URL_LOGO_GUILDA = "LINK_DA_IMAGEM_GRANDE_AQUI" # A imagem do escudo com a águia
-    ID_CANAL_LOGS = 1295495463595802765 
-    
-    # --- 1. CONSTRUÇÃO DO EMBED (Seguindo a imagem) ---
-    embed = discord.Embed(
-        title=f"⚔️ Bem-vindo(a) à Celestial Trindade, {member.name}!",
-        description=(
-            "É uma honra ter você conosco!\n"
-            "Prepare-se para as batalhas e fortaleça nossa guilda.\n\n"
-            "📝 **Como entrar no Grupo**\n"
-            "1. Entre no link do grupo abaixo e peça para entrar.\n"
-            "2. Volte aqui no servidor e digite o comando `/solicitar`.\n\n"
-            "🛡️ **Grupo no Roblox**\n"
-            f"[ENTRAR NO GRUPO]({LINK_GRUPO_ROBLOX})\n\n"
-            "🔗 **Link do Servidor**\n"
-            f"{LINK_SERVIDOR_DISCORD}\n\n"
-            "📢 **Aviso**\n"
-            "Certifique-se de estar no grupo para participar dos eventos e ganhar cargos!"
-        ),
-        color=0xFFD700 # Cor Amarela/Dourada da barra lateral
-    )
-    
-    # Imagem principal (o escudo grande da águia no final)
-    embed.set_image(url=URL_LOGO_GUILDA)
-    
-    # Foto de perfil pequena no topo direito (opcional, como na imagem)
-    embed.set_thumbnail(url=member.display_avatar.url)
-    
-    # Rodapé igual ao da imagem
-    embed.set_footer(text="Celestial Trindade - A serviço da honra.")
-
-    # --- 2. BOTÕES INTERATIVOS ---
-    view = discord.ui.View()
-    view.add_item(discord.ui.Button(label="ENTRAR NO GRUPO", url=LINK_GRUPO_ROBLOX, style=discord.ButtonStyle.link))
-    view.add_item(discord.ui.Button(label="LINK DO SERVIDOR", url=LINK_SERVIDOR_DISCORD, style=discord.ButtonStyle.link))
-
-    # --- 3. ENVIO ---
     try:
-        await member.send(embed=embed, view=view)
+        embed = discord.Embed(
+            title=f"⚔️ Bem-vindo(a) à Celestial Trindade, {member.name}!",
+            description="É uma honra ter você conosco! Prepare-se para as batalhas e fortaleça nossa guilda.",
+            color=discord.Color.gold()
+        )
+        
+        link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
+        link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
+        link_dc = "https://discord.gg/Cj2Ak9JrPc"
+        # Instrução do comando /solicitar
+        embed.add_field(
+            name="📝 Como entrar no Grupo", 
+            value="1. Entre no link do grupo abaixo e peça para entrar.\n2. Volte aqui no servidor e digite o comando `/solicitar`.", 
+            inline=False
+        )
+        embed.add_field(name="💾 Discord", value=f"[ENTRAR NA CT]({link_dc})", inline=False)
+        embed.add_field(name="🛡️ Grupo no Roblox", value=f"[ENTRAR NO GRUPO]({link_grupo})", inline=False)
+        embed.add_field(name="📢 Aviso", value="Certifique-se de estar no grupo para participar dos eventos e ganhar cargos!", inline=False)
+        
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.set_image(url=link_logo)
+        embed.set_footer(text="Celestial Trindade - A serviço da honra.")
+        
+        await member.send(embed=embed)
     except discord.Forbidden:
-        print(f"Não consegui enviar boas-vindas para {member.name}")
+        print(f"❌ DM fechada para {member.name}.")
+    except Exception as e:
+        print(f"❌ Erro no on_member_join: {e}")
 
-    # Log para staff (com a trava de avaliadores)
-    canal_logs = member.guild.get_channel(ID_CANAL_LOGS)
-    if canal_logs:
-        view_staff = AvaliacaoView(candidato_id=member.id)
-        await canal_logs.send(f"📥 **Novo Candidato:** {member.mention} entrou no servidor.", view=view_staff)
-
-# ==========================
+# =========================
 # COMANDOS SLASH (/)
-# ==========================
+# =========================
 
 @bot.tree.command(name="help", description="Mostra a lista completa de comandos e como usá-los")
 async def help_cmd(interaction: discord.Interaction):
