@@ -407,35 +407,46 @@ async def on_ready():
 
 @bot.event
 async def on_member_join(member):
+    # 1. Cria o convite dinâmico (infinito e sem limite de uso)
+    # Escolha um canal fixo do seu servidor para gerar o convite
+    ID_CANAL_CONVITE = 123456789012345678  # COLOQUE O ID DE UM CANAL AQUI
+    guild = member.guild
+    canal = guild.get_channel(ID_CANAL_CONVITE)
+    
+    # Gera o link (se o canal não for encontrado, ele usa um fallback)
+    if canal:
+        invite = await canal.create_invite(max_age=0, max_uses=0, reason="Convite automático para novo candidato")
+    else:
+        invite = "https://discord.gg/SEU_LINK_FIXO" # Caso o bot não ache o canal
+
+    # 2. Tenta enviar a DM para o Candidato
     try:
-        embed = discord.Embed(
-            title=f"⚔️ Bem-vindo(a) à Celestial Trindade, {member.name}!",
-            description="É uma honra ter você conosco! Prepare-se para as batalhas e fortaleça nossa guilda.",
-            color=discord.Color.gold()
+        embed_candidato = discord.Embed(
+            title="✨ Bem-vindo à Celestial Trindade!",
+            description=f"Olá {member.mention}, estamos felizes em ter você aqui!\n\n"
+                        f"Para começar sua jornada, utilize o link abaixo para acessar nosso servidor principal:\n"
+                        f"🔗 **{invite}**\n\n"
+                        "Aguarde, um de nossos avaliadores entrará em contato em breve.",
+            color=discord.Color.blue()
         )
-        
-        link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
-        link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
-
-        # Instrução do comando /solicitar
-        embed.add_field(
-            name="📝 Como entrar no Grupo", 
-            value="1. Entre no link do grupo abaixo e peça para entrar.\n2. Volte aqui no servidor e digite o comando `/solicitar`.", 
-            inline=False
-        )
-        
-        embed.add_field(name="🛡️ Grupo no Roblox", value=f"[ENTRAR NO GRUPO]({link_grupo})", inline=False)
-        embed.add_field(name="📢 Aviso", value="Certifique-se de estar no grupo para participar dos eventos e ganhar cargos!", inline=False)
-        
-        embed.set_thumbnail(url=member.display_avatar.url)
-        embed.set_image(url=link_logo)
-        embed.set_footer(text="Celestial Trindade - A serviço da honra.")
-
-        await member.send(embed=embed)
+        await member.send(embed=embed_candidato)
     except discord.Forbidden:
-        print(f"❌ DM fechada para {member.name}.")
-    except Exception as e:
-        print(f"❌ Erro no on_member_join: {e}")
+        # Se o candidato estiver com a DM fechada, o bot não crasha
+        print(f"Não consegui mandar DM para {member.name} (DM fechada).")
+
+    # 3. Avisa os Avaliadores no canal de Logs
+    ID_CANAL_LOGS = 1295495463595802765 # ID do seu canal de logs
+    canal_logs = guild.get_channel(ID_CANAL_LOGS)
+    
+    if canal_logs:
+        # Criamos a View que já tem a trava de "2 avaliadores" que fizemos
+        view = AvaliacaoView(candidato_id=member.id)
+        
+        await canal_logs.send(
+            f"📥 **Novo Candidato:** {member.mention} entrou.\n"
+            f"Alguém deseja assumir o agendamento?",
+            view=view
+        )
 
 # =========================
 # COMANDOS SLASH (/)
