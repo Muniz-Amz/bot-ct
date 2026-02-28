@@ -417,7 +417,7 @@ async def on_member_join(member):
     if canal:
         invite = await canal.create_invite(max_age=0, max_uses=0, reason="Convite automático para novo candidato")
     else:
-        invite = "https://discord.gg/SEU_LINK_FIXO" # Caso o bot não ache o canal
+        invite = "https://discord.gg/Cj2Ak9JrPc" # Caso o bot não ache o canal
 
     # 2. Tenta enviar a DM para o Candidato
     try:
