@@ -416,7 +416,7 @@ async def on_member_join(member):
         
         link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
         link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
-        link_dc = "https://discord.gg/Cj2Ak9JrPc"
+        link_dc = "https://discord.gg/jMksqDfN77"
         # Instrução do comando /solicitar
         embed.add_field(
             name="📝 Como entrar no Grupo", 
