@@ -401,52 +401,57 @@ async def on_member_join(member):
             pass
         
 @bot.event
-async def on_ready():
-    print(f"✅ Bot logado como {bot.user}")
-    print("👉 Use !deploy no Discord para atualizar os comandos Slash.")
-
-@bot.event
 async def on_member_join(member):
-    # 1. Cria o convite dinâmico (infinito e sem limite de uso)
-    # Escolha um canal fixo do seu servidor para gerar o convite
-    ID_CANAL_CONVITE = 123456789012345678  # COLOQUE O ID DE UM CANAL AQUI
-    guild = member.guild
-    canal = guild.get_channel(ID_CANAL_CONVITE)
+    # --- CONFIGURAÇÕES ---
+    LINK_GRUPO_ROBLOX = "https://www.roblox.com/groups/SEU_ID_AQUI"
+    LINK_SERVIDOR_DISCORD = "https://discord.gg/SEU_CONVITE"
+    URL_LOGO_GUILDA = "LINK_DA_IMAGEM_GRANDE_AQUI" # A imagem do escudo com a águia
+    ID_CANAL_LOGS = 1295495463595802765 
     
-    # Gera o link (se o canal não for encontrado, ele usa um fallback)
-    if canal:
-        invite = await canal.create_invite(max_age=0, max_uses=0, reason="Convite automático para novo candidato")
-    else:
-        invite = "https://discord.gg/Cj2Ak9JrPc" # Caso o bot não ache o canal
+    # --- 1. CONSTRUÇÃO DO EMBED (Seguindo a imagem) ---
+    embed = discord.Embed(
+        title=f"⚔️ Bem-vindo(a) à Celestial Trindade, {member.name}!",
+        description=(
+            "É uma honra ter você conosco!\n"
+            "Prepare-se para as batalhas e fortaleça nossa guilda.\n\n"
+            "📝 **Como entrar no Grupo**\n"
+            "1. Entre no link do grupo abaixo e peça para entrar.\n"
+            "2. Volte aqui no servidor e digite o comando `/solicitar`.\n\n"
+            "🛡️ **Grupo no Roblox**\n"
+            f"[ENTRAR NO GRUPO]({LINK_GRUPO_ROBLOX})\n\n"
+            "🔗 **Link do Servidor**\n"
+            f"{LINK_SERVIDOR_DISCORD}\n\n"
+            "📢 **Aviso**\n"
+            "Certifique-se de estar no grupo para participar dos eventos e ganhar cargos!"
+        ),
+        color=0xFFD700 # Cor Amarela/Dourada da barra lateral
+    )
+    
+    # Imagem principal (o escudo grande da águia no final)
+    embed.set_image(url=URL_LOGO_GUILDA)
+    
+    # Foto de perfil pequena no topo direito (opcional, como na imagem)
+    embed.set_thumbnail(url=member.display_avatar.url)
+    
+    # Rodapé igual ao da imagem
+    embed.set_footer(text="Celestial Trindade - A serviço da honra.")
 
-    # 2. Tenta enviar a DM para o Candidato
+    # --- 2. BOTÕES INTERATIVOS ---
+    view = discord.ui.View()
+    view.add_item(discord.ui.Button(label="ENTRAR NO GRUPO", url=LINK_GRUPO_ROBLOX, style=discord.ButtonStyle.link))
+    view.add_item(discord.ui.Button(label="LINK DO SERVIDOR", url=LINK_SERVIDOR_DISCORD, style=discord.ButtonStyle.link))
+
+    # --- 3. ENVIO ---
     try:
-        embed_candidato = discord.Embed(
-            title="✨ Bem-vindo à Celestial Trindade!",
-            description=f"Olá {member.mention}, estamos felizes em ter você aqui!\n\n"
-                        f"Para começar sua jornada, utilize o link abaixo para acessar nosso servidor principal:\n"
-                        f"🔗 **{invite}**\n\n"
-                        "Aguarde, um de nossos avaliadores entrará em contato em breve.",
-            color=discord.Color.blue()
-        )
-        await member.send(embed=embed_candidato)
+        await member.send(embed=embed, view=view)
     except discord.Forbidden:
-        # Se o candidato estiver com a DM fechada, o bot não crasha
-        print(f"Não consegui mandar DM para {member.name} (DM fechada).")
+        print(f"Não consegui enviar boas-vindas para {member.name}")
 
-    # 3. Avisa os Avaliadores no canal de Logs
-    ID_CANAL_LOGS = 1295495463595802765 # ID do seu canal de logs
-    canal_logs = guild.get_channel(ID_CANAL_LOGS)
-    
+    # Log para staff (com a trava de avaliadores)
+    canal_logs = member.guild.get_channel(ID_CANAL_LOGS)
     if canal_logs:
-        # Criamos a View que já tem a trava de "2 avaliadores" que fizemos
-        view = AvaliacaoView(candidato_id=member.id)
-        
-        await canal_logs.send(
-            f"📥 **Novo Candidato:** {member.mention} entrou.\n"
-            f"Alguém deseja assumir o agendamento?",
-            view=view
-        )
+        view_staff = AvaliacaoView(candidato_id=member.id)
+        await canal_logs.send(f"📥 **Novo Candidato:** {member.mention} entrou no servidor.", view=view_staff)
 
 # ==========================
 # COMANDOS SLASH (/)
