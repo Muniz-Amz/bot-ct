@@ -448,9 +448,9 @@ async def on_member_join(member):
             view=view
         )
 
-# =========================
+# ==========================
 # COMANDOS SLASH (/)
-# =========================
+# ==========================
 
 @bot.tree.command(name="help", description="Mostra a lista completa de comandos e como usá-los")
 async def help_cmd(interaction: discord.Interaction):
