@@ -732,7 +732,7 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
     # Avisa o Discord que vai demorar (evita o bot cair no Render)
     await interaction.response.defer()
 
-    adms_ids = [845105032449884161, 1129212119213146136, 1017444684022427738]
+    adms_ids = [780911191106519060, 1129212119213146136, 1017444684022427738]
     cargos_id = [1395092778614132777]
     mencoes = " ".join([f"<@&{id_cargo}>" for id_cargo in cargos_id])
     link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
