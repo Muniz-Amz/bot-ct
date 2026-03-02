@@ -369,19 +369,23 @@ class GuerraView(discord.ui.View):
 # =========================
 def converter_imagem_sync(input_path, output_path):
     with Image.open(input_path) as img:
-        if img.mode in ("RGBA", "P"):
+        if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+            background = Image.new("RGB", img.size, (0, 0, 0)) 
+            background.paste(img, mask=img.split()[3] if img.mode == "RGBA" else None)
+            img = background
+        else:
             img = img.convert("RGB")
-        img.save(output_path, format="GIF")
+        img.save(output_path, format="GIF", optimize=True)
 
 def extrair_audio_sync(video_path, audio_path):
     with VideoFileClip(video_path, target_resolution=(120, None)) as video:
         video.audio.write_audiofile(audio_path, logger=None, bitrate="64k")
 
 def converter_video_gif_sync(video_path, gif_path):
-    with VideoFileClip(video_path, audio=False, target_resolution=(300, None), fps_source="fps") as clip:
+    with VideoFileClip(video_path, audio=False, target_resolution=(300, None)) as clip:
         duracao = min(clip.duration, 5)
         final = clip.subclip(0, duracao)
-        final.write_gif(gif_path, fps=10, logger=None, colors=128, opt="OptimizePlus")
+        final.write_gif(gif_path, fps=12, logger=None, colors=128, opt="OptimizePlus")
 
 # =========================
 # EVENTOS DO BOT
