@@ -367,40 +367,29 @@ class GuerraView(discord.ui.View):
         await interaction.response.edit_message(view=self)
         await interaction.followup.send("🗑️ Você cancelou sua inscrição.", ephemeral=True)
 
-# =========================
-# FUNÇÕES DE PROCESSAMENTO
-# =========================
-def converter_para_gif_transparente(img_bytes):
-    with Image.open(io.BytesIO(img_bytes)) as img:
-        # 1. Converte para RGBA para tratar a transparência
+def converter_imagem_sync(input_path, output_path):
+    with Image.open(input_path) as img:
+        # 1. Converte para RGBA para ler a imagem original com perfeição
         img = img.convert("RGBA")
         
-        # 2. Redimensiona para 450px (tamanho ideal para não serrilhar no chat)
-        img.thumbnail((450, 450), Image.Resampling.LANCZOS)
+        # 2. Cria um fundo sólido (BRANCO) do mesmo tamanho da imagem
+        # Isso remove qualquer "sujeira" ou marcação fantasma por baixo
+        fundo = Image.new("RGB", img.size, (255, 255, 255))
         
-        # 3. Limpeza de bordas: Remove pixels "sujos" que o GIF não entende
-        alpha = img.getchannel('A')
-        # Torna pixels semi-transparentes em totalmente invisíveis ou sólidos
-        # Isso evita o fundo amarelo/branco nas bordas
-        mask = alpha.point(lambda p: 255 if p > 128 else 0)
-        img.putalpha(mask)
+        # 3. Cola a imagem sobre o fundo usando a própria imagem como máscara
+        # Isso garante que as bordas fiquem idênticas à PNG original
+        fundo.paste(img, (0, 0), mask=img)
         
-        # 4. Converte para modo 'P' (Paleta) preservando a transparência para o GIF
-        # Isso garante que o Discord veja o fundo como "vazio"
-        img_gif = img.convert("RGB").convert("P", palette=Image.ADAPTIVE, colors=255)
+        # 4. Converte para o modo de cores do GIF (P) de forma ADAPTATIVA
+        # O modo ADAPTIVE escolhe as melhores cores para não perder qualidade
+        final = fundo.convert("P", palette=Image.Palette.ADAPTIVE, colors=256)
         
-        buffer = io.BytesIO()
-        # O segredo: 'transparency=0' diz qual cor da paleta é invisível
-        # 'disposal=2' limpa o frame anterior para não bugar o chat
-        img.save(
-            buffer, 
+        # 5. Salva como GIF de quadro único
+        final.save(
+            output_path, 
             format="GIF", 
-            transparency=0, 
-            disposal=2, 
             optimize=True
         )
-        buffer.seek(0)
-        return buffer
 
 def extrair_audio_sync(video_path, audio_path):
     with VideoFileClip(video_path, target_resolution=(120, None)) as video:
@@ -615,25 +604,32 @@ async def videoaudio(interaction: Interaction, arquivo: discord.Attachment):
         for p in (v_path, a_path):
             if os.path.exists(p): os.remove(p)
 
-@bot.tree.command(name="gifct", description="Transforma sua imagem em um GIF de meme transparente!")
+@bot.tree.command(name="gifct", description="Converte PNG para um GIF idêntico e nítido")
 async def gifct(interaction: discord.Interaction, arquivo: discord.Attachment):
-    # Avisa ao Discord que o bot está pensando
     await interaction.response.defer()
     
+    # Geramos nomes únicos para não dar conflito de arquivos no Render
+    i_path = f"input_{uuid.uuid4()}.png"
+    o_path = f"output_{uuid.uuid4()}.gif"
+    
     try:
-        # Lê a imagem direto para a memória (não salva no HD, evitando erros no Render)
-        img_bytes = await arquivo.read()
+        await arquivo.save(i_path)
         
-        # Chama a função nova que você colocou lá em cima
+        # Executa a conversão usando a função acima
         loop = asyncio.get_event_loop()
-        buffer = await loop.run_in_executor(None, converter_para_gif_transparente, img_bytes)
+        await loop.run_in_executor(None, converter_imagem_sync, i_path, o_path)
         
-        # Envia a imagem pronta e limpa para o chat
-        file = discord.File(fp=buffer, filename="meme_celestial.gif")
-        await interaction.followup.send(file=file)
+        # Envia o GIF que agora está IGUAL à PNG
+        await interaction.followup.send(file=discord.File(o_path))
         
     except Exception as e:
-        await interaction.followup.send(f"❌ Erro ao processar imagem: {e}")
+        print(f"Erro no GIFCT: {e}")
+        await interaction.followup.send("❌ Erro ao converter para GIF.")
+    finally:
+        # Limpa os arquivos temporários para o Render não encher
+        for p in (i_path, o_path):
+            if os.path.exists(p): 
+                os.remove(p)
 
 @bot.tree.command(name="regras", description="Exibe as leis fundamentais da Celestial Trindade (Servidor e Jogo)")
 async def regras(interaction: discord.Interaction):
