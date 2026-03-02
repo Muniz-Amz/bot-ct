@@ -369,13 +369,25 @@ class GuerraView(discord.ui.View):
 # =========================
 def converter_imagem_sync(input_path, output_path):
     with Image.open(input_path) as img:
+        # 1. Redimensionamento Preventivo (Evita que o bot trave com imagens 4k)
+        max_size = 400
+        if max(img.size) > max_size:
+            ratio = max_size / float(max(img.size))
+            new_size = tuple([int(x * ratio) for x in img.size])
+            img = img.resize(new_size, Image.LANCZOS)
+
+        # 2. Tratamento do fundo (Garante o BRANCO puro onde era transparente)
         if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
-            background = Image.new("RGB", img.size, (0, 0, 0)) 
-            background.paste(img, mask=img.split()[3] if img.mode == "RGBA" else None)
+            background = Image.new("RGB", img.size, (255, 255, 255))
+            # Usa o canal Alpha como máscara para colar
+            mask = img.split()[3] if img.mode == "RGBA" else None
+            background.paste(img, mask=mask)
             img = background
         else:
             img = img.convert("RGB")
-        img.save(output_path, format="GIF", optimize=True)
+
+        # 3. Salvamento Otimizado (Menos cores = Arquivo menor = Mais rápido)
+        img.save(output_path, format="GIF", optimize=True, palette=Image.ADAPTIVE)
 
 def extrair_audio_sync(video_path, audio_path):
     with VideoFileClip(video_path, target_resolution=(120, None)) as video:
