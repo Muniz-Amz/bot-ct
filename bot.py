@@ -369,31 +369,32 @@ class GuerraView(discord.ui.View):
 # =========================
 def converter_imagem_sync(input_path, output_path):
     with Image.open(input_path) as img:
-        # 1. Converte para RGBA primeiro para garantir que temos o canal de transparência limpo
+        # 1. Força a imagem para RGBA para ter controle total da transparência
         img = img.convert("RGBA")
 
-        # 2. Redimensiona para um tamanho que o Discord processe bem (350px é o ideal)
-        max_size = 350
+        # 2. Redimensiona com Lanczos (O melhor filtro de nitidez)
+        # Fixamos em 400px para garantir qualidade sem estourar a RAM do Render
+        max_size = 400
         img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
 
-        # 3. Criamos o fundo BRANCO PURO
-        # Importante: O fundo deve ser criado DEPOIS do redimensionamento
+        # 3. CRIA O FUNDO BRANCO PERFEITO
+        # Criamos uma tela nova do mesmo tamanho da imagem redimensionada
         background = Image.new("RGBA", img.size, (255, 255, 255, 255))
         
-        # 4. Mesclagem (Alpha Composite) - Isso remove o fundo amarelo/sujo
-        # Ele "funde" a sua logo sobre o branco de forma suave
-        final_img = Image.alpha_composite(background, img)
+        # 4. A MÁGICA: Alpha Composite
+        # Isso funde a logo no branco eliminando qualquer rastro de amarelo ou transparência bugada
+        img_final = Image.alpha_composite(background, img)
 
-        # 5. Converte para RGB final e salva
-        final_img = final_img.convert("RGB")
+        # 5. Converte para RGB (necessário para salvar como GIF estável)
+        img_final = img_final.convert("RGB")
         
-        # 6. Salvamento com Paleta Adaptativa (Evita cores bugadas)
-        final_img.save(
+        # 6. Salva com Dithering (evita aquelas manchas de cores/degradê feio)
+        img_final.save(
             output_path, 
             format="GIF", 
-            optimize=True, 
-            quality=95,
-            palette=Image.Palette.ADAPTIVE
+            optimize=True,
+            palette=Image.Palette.ADAPTIVE,
+            dither=Image.Dither.FLOYDSTEINBERG
         )
 
 def extrair_audio_sync(video_path, audio_path):
