@@ -369,25 +369,32 @@ class GuerraView(discord.ui.View):
 # =========================
 def converter_imagem_sync(input_path, output_path):
     with Image.open(input_path) as img:
-        # 1. Redimensionamento Preventivo (Evita que o bot trave com imagens 4k)
-        max_size = 400
-        if max(img.size) > max_size:
-            ratio = max_size / float(max(img.size))
-            new_size = tuple([int(x * ratio) for x in img.size])
-            img = img.resize(new_size, Image.LANCZOS)
+        # 1. Converte para RGBA primeiro para garantir que temos o canal de transparência limpo
+        img = img.convert("RGBA")
 
-        # 2. Tratamento do fundo (Garante o BRANCO puro onde era transparente)
-        if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
-            background = Image.new("RGB", img.size, (255, 255, 255))
-            # Usa o canal Alpha como máscara para colar
-            mask = img.split()[3] if img.mode == "RGBA" else None
-            background.paste(img, mask=mask)
-            img = background
-        else:
-            img = img.convert("RGB")
+        # 2. Redimensiona para um tamanho que o Discord processe bem (350px é o ideal)
+        max_size = 350
+        img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
 
-        # 3. Salvamento Otimizado (Menos cores = Arquivo menor = Mais rápido)
-        img.save(output_path, format="GIF", optimize=True, palette=Image.ADAPTIVE)
+        # 3. Criamos o fundo BRANCO PURO
+        # Importante: O fundo deve ser criado DEPOIS do redimensionamento
+        background = Image.new("RGBA", img.size, (255, 255, 255, 255))
+        
+        # 4. Mesclagem (Alpha Composite) - Isso remove o fundo amarelo/sujo
+        # Ele "funde" a sua logo sobre o branco de forma suave
+        final_img = Image.alpha_composite(background, img)
+
+        # 5. Converte para RGB final e salva
+        final_img = final_img.convert("RGB")
+        
+        # 6. Salvamento com Paleta Adaptativa (Evita cores bugadas)
+        final_img.save(
+            output_path, 
+            format="GIF", 
+            optimize=True, 
+            quality=95,
+            palette=Image.Palette.ADAPTIVE
+        )
 
 def extrair_audio_sync(video_path, audio_path):
     with VideoFileClip(video_path, target_resolution=(120, None)) as video:
