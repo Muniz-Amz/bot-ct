@@ -1,6 +1,6 @@
 import discord
 from discord import app_commands, Interaction
-from discord.ext import commands
+from discord.ext import commands, tasks
 from PIL import Image
 import os
 import uuid
@@ -11,11 +11,12 @@ import logging
 import random
 from moviepy.editor import VideoFileClip
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import aiohttp
 import discord
 from discord import app_commands
 import io
+
 
 # =========================
 # CONFIGURAÇÕES DE LOG E TOKEN
@@ -791,7 +792,42 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
                 await asyncio.sleep(0.5) 
         except Exception as e:
             print(f"❌ Não consegui enviar DM para o admin {adm_id}: {e}")
+# =========================
+# CONFIGURAÇÃO DE LIMPEZA
+# =========================
+# Coloque aqui todos os IDs dos canais que você quer limpar (separados por vírgula)
+CANAIS_PARA_LIMPAR = [
+    1478852029073063936, # Ex: Canal de Solicitações
+    1478851893319962794, # Ex: Canal de Logs
+    1478215814598365204,
+    1478901434425806941,
+    1478901345963479131  
+]
+@tasks.loop(hours=1) # O bot verifica a cada 1 hora
+async def limpeza_multi_canais():
+    tempo_limite = datetime.now(timezone.utc) - timedelta(days=2)
+    
+    for canal_id in CANAIS_PARA_LIMPAR:
+        canal = bot.get_channel(canal_id)
+        
+        if canal:
+            try:
+                # Limpa mensagens com mais de 2 dias, ignorando as fixadas
+                deleted = await canal.purge(before=tempo_limite, check=lambda m: not m.pinned)
+                if len(deleted) > 0:
+                    print(f"🧹 [LIMPEZA] {len(deleted)} mensagens removidas do canal: {canal.name}")
+            except Exception as e:
+                print(f"❌ Erro ao limpar canal {canal_id}: {e}")
+        else:
+            print(f"⚠️ Canal {canal_id} não encontrado ou o bot não tem acesso.")
 
+# Garante que o bot está pronto antes de começar a limpar
+@limpeza_multi_canais.before_loop
+async def before_limpeza():
+    await bot.wait_until_ready()
+
+# Inicia a tarefa (coloque isso antes do bot.run)
+limpeza_multi_canais.start()
 # =========================
 # COMANDOS ADMINISTRATIVOS
 # =========================
