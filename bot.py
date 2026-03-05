@@ -22,16 +22,16 @@ import io
 # =========================
 logging.basicConfig(level=logging.INFO)
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-ID_CANAL_LOG_AVALIACAO = 1475890030135476387
+ID_CANAL_LOG_AVALIACAO = 1479114414098485383
 
 # Dicionário de Ranks para consulta do Bot
 RANKS_PVP = {
-    "ARCANJO": 1434373467104481300,
-    "SERAFIM": 1299983374047252560,
-    "QUERUBIM": 1317543532910612541,
-    "DIVINDADE": 1314695358294790244,
-    "ANJO": 1317557856077348905,
-    "HEREGE": 1434428766435938416
+    "1": 1434373467104481300,
+    "2": 1299983374047252560,
+    "3": 1317543532910612541,
+    "4": 1314695358294790244,
+    "5": 1317557856077348905,
+    "6": 1434428766435938416
 }
 # ==========================
 # SISTEMA KEEP ALIVE (FLASK)
@@ -40,7 +40,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "🛡️ Celestial Bot - Sistema de Guerra Online!"
+    return "🛡️ Souls Bot - Sistema de Guerra Online!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -91,7 +91,7 @@ class AgendarModal(discord.ui.Modal, title='Agendar Arena'):
         # Ganha tempo para processar logs e DMs
         await interaction.response.defer(ephemeral=True)
         
-        ID_DO_SERVIDOR = 1295495463595802765
+        ID_DO_SERVIDOR = 1358951916004184212
         guild = interaction.client.get_guild(ID_DO_SERVIDOR)
         
         if not guild:
@@ -152,7 +152,7 @@ class ResultadoModal(discord.ui.Modal, title='Definir Resultado'):
         # ESSENCIAL: Avisa ao Discord que o bot está trabalhando (evita timeout de 3s)
         await interaction.response.defer(ephemeral=True)
         
-        ID_DO_SERVIDOR = 1295495463595802765
+        ID_DO_SERVIDOR = 1358951916004184212
         guild = interaction.client.get_guild(ID_DO_SERVIDOR)
         
         try:
@@ -196,7 +196,7 @@ class ResultadoModal(discord.ui.Modal, title='Definir Resultado'):
                     
                     # Tenta avisar o jogador no privado (DM)
                     try:
-                        await membro.send(f"🏆 Parabéns! Seu novo rank na **Celestial Trindade** é: **{cargo_obj.name}**!")
+                        await membro.send(f"🏆 Parabéns! Seu novo rank na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** é: **{cargo_obj.name}**!")
                     except discord.Forbidden:
                         print(f"Não foi possível enviar DM para {membro.name}")
                     
@@ -259,7 +259,7 @@ class SolicitacaoView(discord.ui.View):
         candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
         if candidato:
             try:
-                await candidato.send("🎉 **Parabéns!** Sua solicitação para entrar na **Celestial Trindade** foi **ACEITA**! Seja muito bem-vindo à guilda.")
+                await candidato.send("🎉 **Parabéns!** Sua solicitação para entrar na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi **ACEITA**! Seja muito bem-vindo à Comunidade.")
             except discord.Forbidden:
                 pass
         
@@ -273,7 +273,7 @@ class SolicitacaoView(discord.ui.View):
         candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
         if candidato:
             try:
-                await candidato.send("❌ **Aviso:** Sua solicitação para a **Celestial Trindade** foi **RECUSADA** pelos líderes no momento.")
+                await candidato.send("❌ **Aviso:** Sua solicitação para a **Lᴏsᴛ Sᴏᴜʟs 〔魂〕e** foi **RECUSADA** pelos Donos no momento.")
             except discord.Forbidden:
                 pass
         
@@ -287,7 +287,7 @@ class SolicitacaoView(discord.ui.View):
         candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
         if candidato:
             try:
-                link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
+                link_grupo = " https://www.roblox.com/pt/communities/795234685/Lost-Sou-s#!/about"
                 await candidato.send(f"⚠️ **Atenção:** Os líderes verificaram, mas **você ainda não enviou o pedido no grupo do Roblox**.\nPor favor, entre no link, clique em 'Join Group' (Entrar no Grupo) e faça o comando `/solicitar` novamente no servidor.\n🔗 {link_grupo}")
             except discord.Forbidden:
                 pass
@@ -329,10 +329,10 @@ class GuerraView(discord.ui.View):
             embed_times.description = "A guerra vai começar! Organizem-se nos canais de voz."
             
             lista_a = "\n".join([f"👤 {u.mention}" for u in time_a])
-            embed_times.add_field(name="🔵 TIME ALPHA", value=lista_a, inline=True)
+            embed_times.add_field(name="🔵 TIME 1", value=lista_a, inline=True)
             
             lista_b = "\n".join([f"👤 {u.mention}" for u in time_b])
-            embed_times.add_field(name="🔴 TIME OMEGA", value=lista_b, inline=True)
+            embed_times.add_field(name="🔴 TIME 2", value=lista_b, inline=True)
             
             if self.imagem_url:
                 embed_times.set_image(url=self.imagem_url)
@@ -413,7 +413,7 @@ async def on_member_join(member):
     # Se a conta tiver menos de 7 dias (7 dias * 24h * 3600s)
     if idade_conta.total_seconds() < 604800:
         try:
-            await member.send("🛡️ **Celestial Trindade:** Sua conta é muito recente. Para evitar fakes, só aceitamos contas com mais de 7 dias.")
+            await member.send("🛡️ **Lᴏsᴛ Sᴏᴜʟs 〔魂〕:** Sua conta é muito recente. Para evitar fakes, só aceitamos contas com mais de 7 dias.")
             await member.kick(reason="Conta muito nova (possível alt/fake).")
         except:
             pass
@@ -427,27 +427,27 @@ async def on_ready():
 async def on_member_join(member):
     try:
         embed = discord.Embed(
-            title=f"⚔️ Bem-vindo(a) à Celestial Trindade, {member.name}!",
-            description="É uma honra ter você conosco! Prepare-se para as batalhas e fortaleça nossa guilda.",
+            title=f" Bem-vindo(a) à Lᴏsᴛ Sᴏᴜʟs 〔魂〕, {member.name}!",
+            description="É uma honra ter você conosco! Prepare-se para as batalhas e fortaleça nossa Comunidade.",
             color=discord.Color.gold()
         )
         
-        link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
-        link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
-        link_dc = "https://discord.gg/jMksqDfN77"
+        link_grupo = " https://www.roblox.com/pt/communities/795234685/Lost-Sou-s#!/about"
+        link_logo = "https://media.discordapp.net/attachments/1478217477916987496/1479116565822570496/19_Sem_Titulo_20260304183425.png?ex=69aade25&is=69a98ca5&hm=8c577fb81726bd0b1c856f00bacfe5caef3e3e4e326fc6964f7c6b9440a7eef2&=&format=webp&quality=lossless&width=950&height=950"
+        link_dc = "https://discord.gg/VsCbwamCgm"
         # Instrução do comando /solicitar
         embed.add_field(
             name="📝 Como entrar no Grupo", 
             value="1. Entre no link do grupo abaixo e peça para entrar.\n2. Volte aqui no servidor e digite o comando `/solicitar`.", 
             inline=False
         )
-        embed.add_field(name="💾 Discord", value=f"[ENTRAR NA CT]({link_dc})", inline=False)
+        embed.add_field(name="💾 Discord", value=f"[ENTRAR NA LOST]({link_dc})", inline=False)
         embed.add_field(name="🛡️ Grupo no Roblox", value=f"[ENTRAR NO GRUPO]({link_grupo})", inline=False)
         embed.add_field(name="📢 Aviso", value="Certifique-se de estar no grupo para participar dos eventos e ganhar cargos!", inline=False)
         
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.set_image(url=link_logo)
-        embed.set_footer(text="Celestial Trindade - A serviço da honra.")
+        embed.set_footer(text="Lᴏsᴛ Sᴏᴜʟs 〔魂〕.")
         
         await member.send(embed=embed)
     except discord.Forbidden:
@@ -462,13 +462,13 @@ async def on_member_join(member):
 @bot.tree.command(name="help", description="Mostra a lista completa de comandos e como usá-los")
 async def help_cmd(interaction: discord.Interaction):
     embed = discord.Embed(
-        title="📚 Central de Ajuda - Celestial Bot",
+        title="📚 Central de Ajuda - Lost Bot",
         description="Aqui estão todos os comandos disponíveis para os membros da guilda:",
         color=discord.Color.blue()
     )
     
     embed.add_field(
-        name="⚔️ EVENTOS E GUILDA", 
+        name="⚔️ EVENTOS E COMUNIDADE", 
         value="`/agendar_guerra` - Cria um painel de inscrição para 12 pessoas.\n`/logo` - Informações e link oficial do grupo.\n`/regras` - Exibe as leis do servidor.\n`/solicitar` - Pede aprovação no grupo do Roblox.", 
         inline=False
     )
@@ -485,26 +485,26 @@ async def help_cmd(interaction: discord.Interaction):
         inline=False
     )
     
-    embed.set_footer(text="🛡️ Celestial Trindade", icon_url="https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter")
+    embed.set_footer(text="🛡️ Lᴏsᴛ Sᴏᴜʟs 〔魂〕", icon_url="https://media.discordapp.net/attachments/1478217477916987496/1479116565822570496/19_Sem_Titulo_20260304183425.png?ex=69aade25&is=69a98ca5&hm=8c577fb81726bd0b1c856f00bacfe5caef3e3e4e326fc6964f7c6b9440a7eef2&=&format=webp&quality=lossless&width=950&height=950")
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="ping", description="Verifica a latência atual do bot")
 async def ping(interaction: Interaction):
     await interaction.response.send_message(f"🏓 **Pong!** `{round(bot.latency * 1000)}ms`")
 
-@bot.tree.command(name="logo", description="Mostra a identidade visual e o link da Celestial Trindade")
+@bot.tree.command(name="logo", description="Mostra a identidade visual e o link da Lᴏsᴛ Sᴏᴜʟs 〔魂〕")
 async def logo(interaction: Interaction):
-    link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
-    link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
+    link_grupo = " https://www.roblox.com/pt/communities/795234685/Lost-Sou-s#!/about"
+    link_logo = "https://media.discordapp.net/attachments/1478217477916987496/1479116565822570496/19_Sem_Titulo_20260304183425.png?ex=69aade25&is=69a98ca5&hm=8c577fb81726bd0b1c856f00bacfe5caef3e3e4e326fc6964f7c6b9440a7eef2&=&format=webp&quality=lossless&width=950&height=950"
     
     embed = discord.Embed(
-        title="🛡️ Celestial Trindade - Oficial",
+        title="🛡️ Lᴏsᴛ Sᴏᴜʟs 〔魂〕 - Oficial",
         description="Unidos pela força, guiados pela honra.",
         color=discord.Color.gold()
     )
     embed.add_field(name="🔗 Link do Grupo", value=f"[CLIQUE PARA ENTRAR]({link_grupo})", inline=False)
     embed.add_field(name="⚔️ Status", value="Recrutamento Aberto", inline=True)
-    embed.add_field(name="📜 Requisito", value="Usar logo no Peroxide", inline=True)
+    embed.add_field(name="📜 Requisito", value="Usar logo se preferir", inline=True)
     embed.set_image(url=link_logo)
     embed.set_footer(text=f"Solicitado por {interaction.user.name}", icon_url=interaction.user.display_avatar.url)
     
@@ -534,7 +534,7 @@ async def agendar_guerra(interaction: Interaction, data: str, horario: str, imag
     )
 
     embed.set_image(url=imagem)
-    embed.set_footer(text="Celestial Trindade - Sistema Automático de Guerra")
+    embed.set_footer(text="Lᴏsᴛ Sᴏᴜʟs 〔魂〕 - Sistema Automático de Guerra")
     
     view = GuerraView(imagem_url=imagem)
     await interaction.response.send_message(embed=embed, view=view)
@@ -581,11 +581,11 @@ async def ally(interaction: discord.Interaction, nome: str, id_grupo: str):
 
     embed = discord.Embed(
         title=f"🤝 Aliança: {nome}",
-        description=f"**Celestial Trindade** caminha junto a **{nome}**.\n\n[Clique aqui para visitar o grupo]({link_grupo})",
+        description=f"**Lᴏsᴛ Sᴏᴜʟs 〔魂〕** caminha junto a **{nome}**.\n\n[Clique aqui para visitar o grupo]({link_grupo})",
         color=discord.Color.blue()
     )
     if logo_final: embed.set_image(url=logo_final)
-    embed.set_footer(text="Celestial Trindade - Diplomacia")
+    embed.set_footer(text="Lᴏsᴛ Sᴏᴜʟs 〔魂〕 - Diplomacia")
 
     # Followup é obrigatório após o defer
     await interaction.followup.send(embed=embed)
@@ -623,7 +623,7 @@ async def gifct(interaction: discord.Interaction, arquivo: discord.Attachment):
         await interaction.followup.send(file=discord.File(o_path))
         
     except Exception as e:
-        print(f"Erro no GIFCT: {e}")
+        print(f"Erro no GIF: {e}")
         await interaction.followup.send("❌ Erro ao converter para GIF.")
     finally:
         # Limpa os arquivos temporários para o Render não encher
@@ -631,13 +631,13 @@ async def gifct(interaction: discord.Interaction, arquivo: discord.Attachment):
             if os.path.exists(p): 
                 os.remove(p)
 
-@bot.tree.command(name="regras", description="Exibe as leis fundamentais da Celestial Trindade (Servidor e Jogo)")
+@bot.tree.command(name="regras", description="Exibe as leis fundamentais da Lᴏsᴛ Sᴏᴜʟs 〔魂〕 (Servidor e Jogo)")
 async def regras(interaction: discord.Interaction):
-    link_logo = "https://tr.rbxcdn.com/180DAY-8a0ac9f112f6761f919be4fe156a9cb5/420/420/Image/Webp/noFilter"
+    link_logo = "https://media.discordapp.net/attachments/1478217477916987496/1479116565822570496/19_Sem_Titulo_20260304183425.png?ex=69aade25&is=69a98ca5&hm=8c577fb81726bd0b1c856f00bacfe5caef3e3e4e326fc6964f7c6b9440a7eef2&=&format=webp&quality=lossless&width=950&height=950"
     
     # --- EMBED 1: REGRAS DO SERVIDOR ---
     embed1 = discord.Embed(
-        title="📜 Regras do Servidor - Celestial Trindade",
+        title="📜 Regras do Servidor - Lᴏsᴛ Sᴏᴜʟs 〔魂〕",
         description="O descumprimento destas normas resultará em punições imediatas.",
         color=discord.Color.gold()
     )
@@ -652,10 +652,6 @@ async def regras(interaction: discord.Interaction):
         description="Normas de combate e comportamento in-game.",
         color=discord.Color.dark_red()
     )
-    embed2.add_field(name="🛡️ Identidade", value="**1.** É obrigatório o uso da Logo da Guilda.\n**2.** Proibido lutar contra membros da guilda sem logo.", inline=False)
-    embed2.add_field(name="🚫 Combate e Traição", value="**3.** Proibido Grips/Mortes não justificadas contra membros ou Allys.\n**4.** Proibido deixar aliados morrerem na sua presença.\n**5.** Proibido usar o nome da guilda para causar má reputação. \n**6.** Proibido tentar Burlar as Regras (Má Fé)", inline=False)
-    embed2.add_field(name="⚠️ Observação", value="A guilda não protege membros que ajudam jogadores sem logo ou de guildas inimigas.", inline=False)
-
     # --- EMBED 3: SISTEMA DE WARNS ---
     embed3 = discord.Embed(
         title="⚠️ Sistema de Punições (WARNs)",
@@ -689,7 +685,7 @@ class SolicitacaoView(discord.ui.View):
         candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
         if candidato:
             try:
-                await candidato.send("🎉 **Parabéns!** Sua solicitação para entrar na **Celestial Trindade** foi **ACEITA**! Seja muito bem-vindo à guilda.")
+                await candidato.send("🎉 **Parabéns!** Sua solicitação para entrar na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi **ACEITA**! Seja muito bem-vindo à guilda.")
             except: pass
         await interaction.followup.send("✅ Você aceitou o membro. Mensagem enviada!", ephemeral=True)
 
@@ -699,7 +695,7 @@ class SolicitacaoView(discord.ui.View):
         candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
         if candidato:
             try:
-                await candidato.send("❌ **Aviso:** Sua solicitação para a **Celestial Trindade** foi **RECUSADA** pelos líderes no momento.")
+                await candidato.send("❌ **Aviso:** Sua solicitação para a ***Lᴏsᴛ Sᴏᴜʟs 〔魂〕* foi **RECUSADA** pelos líderes no momento.")
             except: pass
         await interaction.followup.send("❌ Você recusou o membro. Mensagem enviada!", ephemeral=True)
 
@@ -777,7 +773,7 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
     embed.add_field(name="🔗 Perfil", value=f"[Abrir Perfil](https://www.roblox.com/users/profile?username={nick_roblox})", inline=True)
     embed.add_field(name="🛡️ Grupo", value=f"[Verificar Pedidos]({link_grupo})", inline=False)
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
-    embed.set_footer(text="Celestial Trindade - Sistema de Recrutamento")
+    embed.set_footer(text="Lᴏsᴛ Sᴏᴜʟs 〔魂〕 - Sistema de Recrutamento")
 
     # Manda a mensagem pública no servidor
     await interaction.followup.send(
