@@ -835,9 +835,7 @@ async def limpeza_multi_canais():
 async def before_limpeza():
     await bot.wait_until_ready()
 
-# Inicia a tarefa (coloque isso antes do bot.run)
-limpeza_multi_canais.start()
-# =========================
+
 # COMANDOS ADMINISTRATIVOS
 # =========================
 
