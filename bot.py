@@ -751,6 +751,15 @@ async def avaliacao(interaction: discord.Interaction):
     else:
         await interaction.followup.send("❌ Não foi possível avisar os avaliadores. Verifique se as DMs deles estão abertas.", ephemeral=True)
 
+#motor do limpeza
+@bot.event
+async def on_ready():
+    # Inicia a tarefa de limpeza apenas quando o bot estiver pronto
+    if not limpeza_multi_canais.is_running():
+        limpeza_multi_canais.start()
+        
+    print(f"✅ Bot logado como {bot.user}")
+    print("🚀 Sistema de limpeza de 2 dias ativado!")
 # =========================
 # COMANDO /SOLICITAR
 # =========================
