@@ -840,5 +840,9 @@ async def deploy(ctx):
         await ctx.send("✅ **Comandos Slash sincronizados com sucesso!**")
     except Exception as e:
         await ctx.send(f"❌ Erro ao sincronizar: {e}")
+
+# O start() deve ficar "na parede" esquerda, fora de qualquer comando
+limpeza_multi_canais.start()
+
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
