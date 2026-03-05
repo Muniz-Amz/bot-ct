@@ -463,7 +463,7 @@ async def on_member_join(member):
 async def help_cmd(interaction: discord.Interaction):
     embed = discord.Embed(
         title="📚 Central de Ajuda - Lost Bot",
-        description="Aqui estão todos os comandos disponíveis para os membros da guilda:",
+        description="Aqui estão todos os comandos disponíveis para os membros da Comunidade:",
         color=discord.Color.blue()
     )
     
@@ -561,8 +561,8 @@ async def videogif(interaction: Interaction, arquivo: discord.Attachment):
 # =========================
 # COMANDO: ALLY COM CACHE BREAK (FIXED)
 # =========================
-@bot.tree.command(name="ally", description="Exibe a logo atualizada de uma guilda aliada")
-@app_commands.describe(nome="Nome da guilda aliada", id_grupo="O ID numérico do grupo no Roblox")
+@bot.tree.command(name="ally", description="Exibe a logo atualizada de uma Comunidade aliada")
+@app_commands.describe(nome="Nome da Comunidade aliada", id_grupo="O ID numérico do grupo no Roblox")
 async def ally(interaction: discord.Interaction, nome: str, id_grupo: str):
     # Defer evita o erro "Unknown Interaction" (404/10062)
     await interaction.response.defer() 
@@ -642,7 +642,7 @@ async def regras(interaction: discord.Interaction):
         color=discord.Color.gold()
     )
     embed1.add_field(name="⚖️ Conduta Básica", value="**1.** Respeito mútuo acima de tudo.\n**2.** Proibido qualquer tipo de Discriminação/Racismo/Homofobia.\n**3.** Proibido Spam de mensagens repetitivas.", inline=False)
-    embed1.add_field(name="🚫 Proibições", value="**4.** Conteúdo +18 (Pornografia/Gifs) é proibido.\n**5.** Proibido divulgar outros servidores/canais sem permissão.\n**6.** Proibido vazar informações internas da guilda.\n**7.** Proibido mendigar cargo ou promoções.", inline=False)
+    embed1.add_field(name="🚫 Proibições", value="**4.** Conteúdo +18 (Pornografia/Gifs) é proibido.\n**5.** Proibido divulgar outros servidores/canais sem permissão.\n**6.** Proibido vazar informações internas da Comunidade.\n**7.** Proibido mendigar cargo ou promoções.", inline=False)
     embed1.add_field(name="👥 Outros", value="**8.** Evite intrigas por religião ou política.\n**9.** Idade mínima: 13 anos.", inline=False)
     embed1.set_thumbnail(url=link_logo)
 
@@ -685,7 +685,7 @@ class SolicitacaoView(discord.ui.View):
         candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
         if candidato:
             try:
-                await candidato.send("🎉 **Parabéns!** Sua solicitação para entrar na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi **ACEITA**! Seja muito bem-vindo à guilda.")
+                await candidato.send("🎉 **Parabéns!** Sua solicitação para entrar na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi **ACEITA**! Seja muito bem-vindo à Comunidade.")
             except: pass
         await interaction.followup.send("✅ Você aceitou o membro. Mensagem enviada!", ephemeral=True)
 
@@ -705,7 +705,7 @@ class SolicitacaoView(discord.ui.View):
         candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
         if candidato:
             try:
-                link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
+                link_grupo = "https://www.roblox.com/pt/communities/795234685/Lost-Sou-s#!/about"
                 await candidato.send(f"⚠️ **Atenção:** Os líderes verificaram, mas **você ainda não enviou o pedido no grupo do Roblox**.\nPor favor, entre no link, clique em 'Join Group' e faça o comando `/solicitar` novamente.\n🔗 {link_grupo}")
             except: pass
         await interaction.followup.send("⚠️ Você avisou que ele não fez o pedido. Mensagem enviada!", ephemeral=True)
@@ -719,7 +719,7 @@ async def avaliacao(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
 
     # Lista de IDs dos seus avaliadores
-    avaliadores_ids = [1129212119213146136, 1017444684022427738, 1277257295616540775]
+    avaliadores_ids = [1389503739018219571]
     
     embed_aviso = discord.Embed(
         title="⚔️ Solicitação de Avaliação",
@@ -759,10 +759,10 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
     # Avisa o Discord que vai demorar (evita o bot cair no Render)
     await interaction.response.defer()
 
-    adms_ids = [780911191106519060, 1129212119213146136, 1017444684022427738]
-    cargos_id = [1395092778614132777]
+    adms_ids = [1389503739018219571]
+    cargos_id = []
     mencoes = " ".join([f"<@&{id_cargo}>" for id_cargo in cargos_id])
-    link_grupo = "https://www.roblox.com/pt/communities/34214394/Celestial-Trindade#!/about"
+    link_grupo = "https://www.roblox.com/pt/communities/795234685/Lost-Sou-s#!/about"
     
     embed = discord.Embed(
         title="📝 Nova Solicitação de Entrada",
@@ -787,7 +787,7 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
             admin = await bot.fetch_user(adm_id)
             if admin:
                 view = SolicitacaoView(candidato_id=interaction.user.id)
-                await admin.send(f"⚠️ **Ação Necessária:** {interaction.user.name} quer entrar na guilda. Escolha uma opção:", embed=embed, view=view)
+                await admin.send(f"⚠️ **Ação Necessária:** {interaction.user.name} quer entrar na Comunidade. Escolha uma opção:", embed=embed, view=view)
                 await asyncio.sleep(0.5) 
         except Exception as e:
             print(f"❌ Não consegui enviar DM para o admin {adm_id}: {e}")
