@@ -605,7 +605,7 @@ async def videoaudio(interaction: Interaction, arquivo: discord.Attachment):
         for p in (v_path, a_path):
             if os.path.exists(p): os.remove(p)
 
-@bot.tree.command(name="gifct", description="Converte PNG para um GIF idêntico e nítido")
+@bot.tree.command(name="gifs", description="Converte PNG para um GIF idêntico e nítido")
 async def gifct(interaction: discord.Interaction, arquivo: discord.Attachment):
     await interaction.response.defer()
     
@@ -647,12 +647,15 @@ async def regras(interaction: discord.Interaction):
     embed1.add_field(name="👥 Outros", value="**8.** Evite intrigas por religião ou política.\n**9.** Idade mínima: 13 anos.", inline=False)
     embed1.set_thumbnail(url=link_logo)
 
-    # --- EMBED 2: REGRAS DO JOGO (PEROXIDE) ---
+    # --- EMBED 2: REGRAS DO JOGO  ---
     embed2 = discord.Embed(
-        title="⚔️ Regras do Jogo - Peroxide",
+        title="⚔️ Regras Jogo ",
         description="Normas de combate e comportamento in-game.",
         color=discord.Color.dark_red()
     )
+    embed2.add_field(name="🛡️ Identidade", value="1. É obrigatório o uso da Logo da Guilda.\n2. Proibido lutar contra membros da guilda sem logo.", inline=False)
+    embed2.add_field(name="🚫 Combate e Traição", value="3. Proibido Grips/Mortes não justificadas contra membros ou Allys.\n4. Proibido deixar aliados morrerem na sua presença.\n5. Proibido usar o nome da guilda para causar má reputação. \n6. Proibido tentar Burlar as Regras (Má Fé)", inline=False)
+    embed2.add_field(name="⚠️ Observação", value="A guilda não protege membros que ajudam jogadores sem logo ou de guildas inimigas.", inline=False)
     # --- EMBED 3: SISTEMA DE WARNS ---
     embed3 = discord.Embed(
         title="⚠️ Sistema de Punições (WARNs)",
@@ -801,6 +804,27 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
                 await asyncio.sleep(0.5) 
         except Exception as e:
             print(f"❌ Não consegui enviar DM para o admin {adm_id}: {e}")
+
+@bot.tree.command(name="limpar", description="Apaga mensagens do canal atual (Admin)")
+@app_commands.describe(quantidade="Número de mensagens para apagar", dias="Apagar mensagens anteriores a X dias")
+async def limpar(interaction: discord.Interaction, quantidade: int = 100, dias: int = 0):
+    # Verifica se o usuário tem permissão de gerenciar mensagens
+    if not interaction.user.guild_permissions.manage_messages:
+        return await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
+
+    await interaction.response.defer(ephemeral=True)
+    
+    # Define o limite de tempo (se dias for 0, apaga as mais recentes)
+    tempo_limite = None
+    if dias > 0:
+        tempo_limite = datetime.now(timezone.utc) - timedelta(days=dias)
+
+    try:
+        # Executa a limpeza
+        deleted = await interaction.channel.purge(limit=quantidade, before=tempo_limite, check=lambda m: not m.pinned)
+        await interaction.followup.send(f"🧹 Sucesso! **{len(deleted)}** mensagens foram removidas.", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Erro ao limpar: {e}", ephemeral=True)
 # =========================
 # CONFIGURAÇÃO DE LIMPEZA
 # =========================
