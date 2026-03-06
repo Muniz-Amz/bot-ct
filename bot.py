@@ -17,7 +17,6 @@ import discord
 from discord import app_commands
 import io
 
-
 # =========================
 # CONFIGURAÇÕES DE LOG E TOKEN
 # =========================
@@ -685,69 +684,59 @@ ID_CANAL_LOGS = 1479582664590889071
 
 # --- VIEW DE SOLICITAÇÃO (O QUE O ADM VÊ) ---
 class SolicitacaoView(discord.ui.View):
-    def __init__(self, solicitante: discord.Member, motivo: str):
+    def __init__(self, solicitante: discord.Member, nick_roblox: str):
         super().__init__(timeout=None)
         self.solicitante = solicitante
-        self.motivo = motivo
+        self.nick_roblox = nick_roblox
 
-    # 1. BOTÃO ACEITAR
-    @discord.ui.button(label="✅ Aceitar", style=discord.ButtonStyle.green, custom_id="btn_solicitar_aceitar")
-    async def aceitar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        guild = interaction.guild
-        cargo = guild.get_role(ID_CARGO_ACEITO)
-        
-        # TRAVA: Desativa botões na hora para impedir cliques de outros ADMs
+    async def finalizar_painel(self, interaction: discord.Interaction, texto_log: str):
+        # Desativa os botões para ninguém clicar de novo
         for child in self.children:
             child.disabled = True
+        await interaction.response.edit_message(
+            content=f"👤 **Candidato:** {self.solicitante.mention} (`{self.nick_roblox}`)\n{texto_log}\n🛡️ **Responsável:** {interaction.user.mention}", 
+            view=self
+        )
+
+    # 1. ACEITAR (Aprova no Roblox + Dá Cargo)
+    @discord.ui.button(label="✅ Aceitar", style=discord.ButtonStyle.green, custom_id="btn_aceitar_final")
+    async def aceitar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        cargo = interaction.guild.get_role(ID_CARGO_ACEITO)
+        status = "✅ **Solicitação Aceita! Membro aprovado e cargo entregue.**"
         
         try:
             if cargo:
                 await self.solicitante.add_roles(cargo)
-                status_txt = "✅ **Membro aceito e cargo entregue!**"
-            else:
-                status_txt = "⚠️ **Erro: Cargo não encontrado no servidor.**"
-        except discord.Forbidden:
-            status_txt = "❌ **Erro: O Bot não tem permissão para dar este cargo.**"
-        except Exception as e:
-            status_txt = f"❌ **Erro técnico:** {e}"
-
-        # Atualiza a mensagem no canal de logs (Remove botões e mostra quem aprovou)
-        await interaction.response.edit_message(
-            content=f"👤 **Membro:** {self.solicitante.mention}\n{status_txt}\n🛡️ **Aprovado por:** {interaction.user.mention}", 
-            view=self
-        )
-        
-        # Envia apenas UMA mensagem no privado do membro
-        try:
-            embed_dm = discord.Embed(
-                title="⚔️ Solicitação Aprovada!",
-                description=f"Sua entrada na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi aceita por {interaction.user.mention}.\n\nVocê já recebeu seu cargo e acesso aos canais!",
-                color=discord.Color.green()
-            )
-            await self.solicitante.send(embed=embed_dm)
         except:
-            pass # Se o PV estiver fechado, ignora
+            status = "⚠️ **Aceito, mas houve erro na entrega do cargo (verifique a hierarquia).**"
 
-    # 2. BOTÃO RECUSAR
-    @discord.ui.button(label="❌ Recusar", style=discord.ButtonStyle.red, custom_id="btn_solicitar_recusar")
+        await self.finalizar_painel(interaction, status)
+        
+        try:
+            await self.solicitante.send(f"🎉 **Boas notícias!** Sua solicitação para a **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi **ACEITA**!\nAgora você já tem acesso total ao servidor e será aprovado no grupo do Roblox.")
+        except: pass
+
+    # 2. RECUSAR
+    @discord.ui.button(label="❌ Recusar", style=discord.ButtonStyle.red, custom_id="btn_recusar_final")
     async def recusar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        for child in self.children:
-            child.disabled = True
-            
-        await interaction.response.edit_message(
-            content=f"❌ **Solicitação de {self.solicitante.mention} recusada por {interaction.user.mention}.**", 
-            view=self
-        )
-        
+        await self.finalizar_painel(interaction, "❌ **Solicitação Recusada pela liderança.**")
         try:
-            await self.solicitante.send("Sua solicitação para a **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi recusada.")
-        except:
-            pass
+            await self.solicitante.send("❌ **Aviso:** Sua solicitação para a **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi recusada no momento.")
+        except: pass
 
-    # 3. BOTÃO VER PEDIDO (Apenas o ADM que clica vê o texto)
-    @discord.ui.button(label="📝 Ver Pedido", style=discord.ButtonStyle.grey, custom_id="btn_solicitar_info")
-    async def info(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(f"📄 **Mensagem de {self.solicitante.name}:**\n> {self.motivo}", ephemeral=True)
+    # 3. FALTOU PEDIDO NO ROBLOX (O que estava faltando!)
+    @discord.ui.button(label="⚠️ Faltou Pedido", style=discord.ButtonStyle.secondary, custom_id="btn_faltou_final")
+    async def faltou_pedido(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.finalizar_painel(interaction, "⚠️ **Avisado: Não enviou pedido no Roblox.**")
+        try:
+            link_grupo = "https://www.roblox.com/pt/communities/795234685/Lost-Sou-s#!/about"
+            await self.solicitante.send(
+                f"⚠️ **Olá!** Verificamos sua solicitação, mas **você ainda não enviou o pedido no grupo do Roblox**.\n\n"
+                f"Para entrar, você precisa:\n1️⃣ Acessar o link: {link_grupo}\n"
+                f"2️⃣ Clicar em **'Join Group'** (Entrar no Grupo).\n"
+                f"3️⃣ Depois de fazer isso, use o comando `/solicitar` novamente aqui no Discord."
+            )
+        except: pass
 # =========================
 # COMANDO /AVALIACAO
 # =========================
@@ -800,41 +789,24 @@ async def on_ready():
 # =========================
 # COMANDO /SOLICITAR
 # =========================
-# --- COMANDO /SOLICITAR ATUALIZADO ---
-@bot.tree.command(name="solicitar", description="Pede aprovação para entrar na Lᴏsᴛ Sᴏᴜʟs")
-@app_commands.describe(nick_roblox="Seu nome de usuário (Username) no Roblox")
+@bot.tree.command(name="solicitar", description="Peça para entrar na guilda e no grupo do Roblox")
+@app_commands.describe(nick_roblox="Seu Nick exato do Roblox")
 async def solicitar(interaction: discord.Interaction, nick_roblox: str):
-    # Canal de logs onde os ADMs avaliam
-    canal_logs = bot.get_channel(1479582664590889071)
-    link_grupo = "https://www.roblox.com/pt/communities/795234685/Lost-Sou-s#!/about"
+    canal_logs = bot.get_channel(ID_CANAL_LOGS)
     
     if not canal_logs:
-        return await interaction.response.send_message("❌ Erro: Canal de avaliação não encontrado.", ephemeral=True)
+        return await interaction.response.send_message("❌ Canal de avaliação não encontrado.", ephemeral=True)
 
-    # Cria a View com a lógica de Cargo Automático e Trava
-    # Passamos o nick_roblox como o "motivo" para aparecer no botão "Ver Pedido"
-    view = SolicitacaoView(solicitante=interaction.user, motivo=f"Nick Roblox: {nick_roblox}")
+    view = SolicitacaoView(solicitante=interaction.user, nick_roblox=nick_roblox)
+    
+    embed = discord.Embed(title="🛡️ Nova Solicitação de Entrada", color=discord.Color.blue())
+    embed.add_field(name="👤 Usuário Discord", value=interaction.user.mention, inline=True)
+    embed.add_field(name="🎮 Nick Roblox", value=f"`{nick_roblox}`", inline=True)
+    embed.add_field(name="🔗 Perfil", value=f"[Ver no Roblox](https://www.roblox.com/users/profile?username={nick_roblox})", inline=False)
+    embed.set_footer(text="Avalie o pedido e aceite se ele estiver no grupo.")
 
-    embed = discord.Embed(
-        title="🛡️ Nova Solicitação de Entrada",
-        description=f"O membro {interaction.user.mention} quer entrar na guilda.",
-        color=discord.Color.blue()
-    )
-    embed.add_field(name="👤 Nick no Roblox", value=f"`{nick_roblox}`", inline=True)
-    embed.add_field(name="🔗 Perfil", value=f"[Abrir Perfil](https://www.roblox.com/users/profile?username={nick_roblox})", inline=True)
-    embed.add_field(name="🛡️ Grupo", value=f"[Verificar Pedidos]({link_grupo})", inline=False)
-    embed.set_thumbnail(url=interaction.user.display_avatar.url)
-    embed.set_footer(text="Lᴏsᴛ Sᴏᴜʟs 〔魂〕 - Sistema de Recrutamento")
-
-    # 1. Envia no canal de logs para os ADMs (com um PING para eles verem)
-    # Você pode colocar os IDs de menção aqui se quiser
-    await canal_logs.send(content="🔔 **Nova solicitação pendente!**", embed=embed, view=view)
-
-    # 2. Responde ao usuário (apenas ele vê que deu certo)
-    await interaction.response.send_message(
-        "✅ **Sua solicitação foi enviada com sucesso!**\nNossa liderança irá avaliar seu perfil e você receberá um aviso no privado em breve.", 
-        ephemeral=True
-    )
+    await canal_logs.send(content="🔔 **Nova solicitação para a Liderança!**", embed=embed, view=view)
+    await interaction.response.send_message("✅ **Solicitação enviada!** Verifique se você já pediu para entrar no grupo do Roblox.", ephemeral=True)
 
 @bot.tree.command(name="limpar", description="Apaga mensagens do canal atual (Admin)")
 @app_commands.describe(quantidade="Número de mensagens para apagar", dias="Apagar mensagens anteriores a X dias")
