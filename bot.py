@@ -699,14 +699,16 @@ class SolicitacaoView(discord.ui.View):
         )
     @discord.ui.button(label="🔍 Verificar Pedido", style=discord.ButtonStyle.grey, custom_id="btn_verificar_pratico")
     async def verificar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Gera o link de redirecionamento automático usando o Nick fornecido
-        link_perfil = f"https://www.roblox.com/users/profile?username={self.nick_roblox}"
+        # Link direto para a aba de pedidos do seu grupo no Roblox
+        link_painel_roblox = "https://www.roblox.com/pt/communities/configure?id=795234685#!/join-requests"
+        link_perfil_user = f"https://www.roblox.com/users/profile?username={self.nick_roblox}"
         
         await interaction.response.send_message(
-            content=f"📑 **Painel de Verificação Rápida:**\n"
-                    f"**Nick:** `{self.nick_roblox}`\n"
-                    f"**Perfil:** [Clique para Abrir o Perfil]({link_perfil})\n"
-                    f"*Confira se ele solicitou entrada no grupo antes de aceitar!*",
+            content=f"📑 **Painel de Verificação Rápida:**\n\n"
+                    f"1️⃣ **Nick para buscar:** `{self.nick_roblox}`\n"
+                    f"2️⃣ **Abrir Pedidos do Grupo:** [Clique para Abrir Painel]({link_painel_roblox})\n"
+                    f"3️⃣ **Ver Perfil do Player:** [Abrir Perfil no Roblox]({link_perfil_user})\n\n"
+                    f"*Dica: Abra o painel do grupo e use o Nick acima para achar o jogador rapidamente!*",
             ephemeral=True
         )
     # 1. ACEITAR (Aprova no Roblox + Dá Cargo)
