@@ -239,62 +239,6 @@ class AvaliacaoView(discord.ui.View):
         await interaction.response.send_modal(ResultadoModal(candidato_id=self.candidato_id))
 
 # =========================
-# Botão Do Rejeitar
-# =========================
-class SolicitacaoView(discord.ui.View):
-    def __init__(self, candidato_id: int):
-        super().__init__(timeout=None) # Não expira sozinho
-        self.candidato_id = candidato_id
-
-    # Função auxiliar para desativar os botões após alguém clicar
-    async def desativar_botoes(self, interaction: discord.Interaction):
-        for item in self.children:
-            item.disabled = True
-        await interaction.response.edit_message(view=self)
-
-    # BOTÃO 1: ACEITAR
-    @discord.ui.button(label="✅ Aceitar", style=discord.ButtonStyle.success, custom_id="btn_aceitar")
-    async def aceitar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.desativar_botoes(interaction)
-        
-        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
-        if candidato:
-            try:
-                await candidato.send("🎉 **Parabéns!** Sua solicitação para entrar na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi **ACEITA**! Seja muito bem-vindo à Comunidade.")
-            except discord.Forbidden:
-                pass
-        
-        await interaction.followup.send("✅ Você aceitou o membro. Aviso enviado!", ephemeral=True)
-
-    # BOTÃO 2: RECUSAR
-    @discord.ui.button(label="❌ Recusar", style=discord.ButtonStyle.danger, custom_id="btn_recusar")
-    async def recusar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.desativar_botoes(interaction)
-        
-        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
-        if candidato:
-            try:
-                await candidato.send("❌ **Aviso:** Sua solicitação para a **Lᴏsᴛ Sᴏᴜʟs 〔魂〕e** foi **RECUSADA** pelos Donos no momento.")
-            except discord.Forbidden:
-                pass
-        
-        await interaction.followup.send("❌ Você recusou o membro. Aviso enviado!", ephemeral=True)
-
-    # BOTÃO 3: FALTOU PEDIDO NO ROBLOX
-    @discord.ui.button(label="⚠️ Faltou Pedido", style=discord.ButtonStyle.secondary, custom_id="btn_faltou")
-    async def faltou_pedido(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.desativar_botoes(interaction)
-        
-        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
-        if candidato:
-            try:
-                link_grupo = " https://www.roblox.com/pt/communities/795234685/Lost-Sou-s#!/about"
-                await candidato.send(f"⚠️ **Atenção:** Os líderes verificaram, mas **você ainda não enviou o pedido no grupo do Roblox**.\nPor favor, entre no link, clique em 'Join Group' (Entrar no Grupo) e faça o comando `/solicitar` novamente no servidor.\n🔗 {link_grupo}")
-            except discord.Forbidden:
-                pass
-        
-        await interaction.followup.send("⚠️ Você avisou que ele não fez o pedido no Roblox.", ephemeral=True)
-# =========================
 # SISTEMA DE GUERRA (LOGICA ATUALIZADA)
 # =========================
 class GuerraView(discord.ui.View):
@@ -733,50 +677,77 @@ async def regras(interaction: discord.Interaction):
     # Enviando tudo de uma vez
     await interaction.response.send_message(embeds=[embed1, embed2, embed3])
 
-# =========================
-# SISTEMA DE BOTÕES (DMs DOS LÍDERES)
-# =========================
+# ==========================================
+# CONFIGURAÇÕES DE ID (Lᴏsᴛ Sᴏᴜʟs)
+# ==========================================
+ID_CARGO_ACEITO = 1358951916138270784
+ID_CANAL_LOGS = 1479582664590889071
+
+# --- VIEW DE SOLICITAÇÃO (O QUE O ADM VÊ) ---
 class SolicitacaoView(discord.ui.View):
-    def __init__(self, candidato_id: int):
+    def __init__(self, solicitante: discord.Member, motivo: str):
         super().__init__(timeout=None)
-        self.candidato_id = candidato_id
+        self.solicitante = solicitante
+        self.motivo = motivo
 
-    async def desativar_botoes(self, interaction: discord.Interaction):
-        for item in self.children:
-            item.disabled = True
-        await interaction.response.edit_message(view=self)
-
-    @discord.ui.button(label="✅ Aceitar", style=discord.ButtonStyle.success, custom_id="btn_aceitar")
+    # 1. BOTÃO ACEITAR
+    @discord.ui.button(label="✅ Aceitar", style=discord.ButtonStyle.green, custom_id="btn_solicitar_aceitar")
     async def aceitar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.desativar_botoes(interaction)
-        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
-        if candidato:
-            try:
-                await candidato.send("🎉 **Parabéns!** Sua solicitação para entrar na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi **ACEITA**! Seja muito bem-vindo à Comunidade.")
-            except: pass
-        await interaction.followup.send("✅ Você aceitou o membro. Mensagem enviada!", ephemeral=True)
+        guild = interaction.guild
+        cargo = guild.get_role(ID_CARGO_ACEITO)
+        
+        # TRAVA: Desativa botões na hora para impedir cliques de outros ADMs
+        for child in self.children:
+            child.disabled = True
+        
+        try:
+            if cargo:
+                await self.solicitante.add_roles(cargo)
+                status_txt = "✅ **Membro aceito e cargo entregue!**"
+            else:
+                status_txt = "⚠️ **Erro: Cargo não encontrado no servidor.**"
+        except discord.Forbidden:
+            status_txt = "❌ **Erro: O Bot não tem permissão para dar este cargo.**"
+        except Exception as e:
+            status_txt = f"❌ **Erro técnico:** {e}"
 
-    @discord.ui.button(label="❌ Recusar", style=discord.ButtonStyle.danger, custom_id="btn_recusar")
+        # Atualiza a mensagem no canal de logs (Remove botões e mostra quem aprovou)
+        await interaction.response.edit_message(
+            content=f"👤 **Membro:** {self.solicitante.mention}\n{status_txt}\n🛡️ **Aprovado por:** {interaction.user.mention}", 
+            view=self
+        )
+        
+        # Envia apenas UMA mensagem no privado do membro
+        try:
+            embed_dm = discord.Embed(
+                title="⚔️ Solicitação Aprovada!",
+                description=f"Sua entrada na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi aceita por {interaction.user.mention}.\n\nVocê já recebeu seu cargo e acesso aos canais!",
+                color=discord.Color.green()
+            )
+            await self.solicitante.send(embed=embed_dm)
+        except:
+            pass # Se o PV estiver fechado, ignora
+
+    # 2. BOTÃO RECUSAR
+    @discord.ui.button(label="❌ Recusar", style=discord.ButtonStyle.red, custom_id="btn_solicitar_recusar")
     async def recusar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.desativar_botoes(interaction)
-        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
-        if candidato:
-            try:
-                await candidato.send("❌ **Aviso:** Sua solicitação para a ***Lᴏsᴛ Sᴏᴜʟs 〔魂〕* foi **RECUSADA** pelos líderes no momento.")
-            except: pass
-        await interaction.followup.send("❌ Você recusou o membro. Mensagem enviada!", ephemeral=True)
+        for child in self.children:
+            child.disabled = True
+            
+        await interaction.response.edit_message(
+            content=f"❌ **Solicitação de {self.solicitante.mention} recusada por {interaction.user.mention}.**", 
+            view=self
+        )
+        
+        try:
+            await self.solicitante.send("Sua solicitação para a **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi recusada.")
+        except:
+            pass
 
-    @discord.ui.button(label="⚠️ Faltou Pedido", style=discord.ButtonStyle.secondary, custom_id="btn_faltou")
-    async def faltou_pedido(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.desativar_botoes(interaction)
-        candidato = interaction.client.get_user(self.candidato_id) or await interaction.client.fetch_user(self.candidato_id)
-        if candidato:
-            try:
-                link_grupo = "https://www.roblox.com/pt/communities/795234685/Lost-Sou-s#!/about"
-                await candidato.send(f"⚠️ **Atenção:** Os líderes verificaram, mas **você ainda não enviou o pedido no grupo do Roblox**.\nPor favor, entre no link, clique em 'Join Group' e faça o comando `/solicitar` novamente.\n🔗 {link_grupo}")
-            except: pass
-        await interaction.followup.send("⚠️ Você avisou que ele não fez o pedido. Mensagem enviada!", ephemeral=True)
-
+    # 3. BOTÃO VER PEDIDO (Apenas o ADM que clica vê o texto)
+    @discord.ui.button(label="📝 Ver Pedido", style=discord.ButtonStyle.grey, custom_id="btn_solicitar_info")
+    async def info(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(f"📄 **Mensagem de {self.solicitante.name}:**\n> {self.motivo}", ephemeral=True)
 # =========================
 # COMANDO /AVALIACAO
 # =========================
@@ -829,20 +800,24 @@ async def on_ready():
 # =========================
 # COMANDO /SOLICITAR
 # =========================
-@bot.tree.command(name="solicitar", description="Pede aprovação no grupo do Roblox")
+# --- COMANDO /SOLICITAR ATUALIZADO ---
+@bot.tree.command(name="solicitar", description="Pede aprovação para entrar na Lᴏsᴛ Sᴏᴜʟs")
 @app_commands.describe(nick_roblox="Seu nome de usuário (Username) no Roblox")
 async def solicitar(interaction: discord.Interaction, nick_roblox: str):
-    # Avisa o Discord que vai demorar (evita o bot cair no Render)
-    await interaction.response.defer()
-
-    adms_ids = [1389503739018219571,1046194613066678333,1017444684022427738]
-    cargos_id = []
-    mencoes = " ".join([f"<@&{id_cargo}>" for id_cargo in cargos_id])
+    # Canal de logs onde os ADMs avaliam
+    canal_logs = bot.get_channel(1479582664590889071)
     link_grupo = "https://www.roblox.com/pt/communities/795234685/Lost-Sou-s#!/about"
     
+    if not canal_logs:
+        return await interaction.response.send_message("❌ Erro: Canal de avaliação não encontrado.", ephemeral=True)
+
+    # Cria a View com a lógica de Cargo Automático e Trava
+    # Passamos o nick_roblox como o "motivo" para aparecer no botão "Ver Pedido"
+    view = SolicitacaoView(solicitante=interaction.user, motivo=f"Nick Roblox: {nick_roblox}")
+
     embed = discord.Embed(
-        title="📝 Nova Solicitação de Entrada",
-        description=f"O membro {interaction.user.mention} solicitou aprovação no grupo do Roblox.",
+        title="🛡️ Nova Solicitação de Entrada",
+        description=f"O membro {interaction.user.mention} quer entrar na guilda.",
         color=discord.Color.blue()
     )
     embed.add_field(name="👤 Nick no Roblox", value=f"`{nick_roblox}`", inline=True)
@@ -851,22 +826,15 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
     embed.set_footer(text="Lᴏsᴛ Sᴏᴜʟs 〔魂〕 - Sistema de Recrutamento")
 
-    # Manda a mensagem pública no servidor
-    await interaction.followup.send(
-        content=f"🔔 {mencoes}, novo guerreiro aguardando aprovação!\n*A liderança já recebeu o painel de aprovação.*", 
-        embed=embed
-    )
+    # 1. Envia no canal de logs para os ADMs (com um PING para eles verem)
+    # Você pode colocar os IDs de menção aqui se quiser
+    await canal_logs.send(content="🔔 **Nova solicitação pendente!**", embed=embed, view=view)
 
-    # Manda as DMs para os líderes COM OS BOTÕES
-    for adm_id in adms_ids:
-        try:
-            admin = await bot.fetch_user(adm_id)
-            if admin:
-                view = SolicitacaoView(candidato_id=interaction.user.id)
-                await admin.send(f"⚠️ **Ação Necessária:** {interaction.user.name} quer entrar na Comunidade. Escolha uma opção:", embed=embed, view=view)
-                await asyncio.sleep(0.5) 
-        except Exception as e:
-            print(f"❌ Não consegui enviar DM para o admin {adm_id}: {e}")
+    # 2. Responde ao usuário (apenas ele vê que deu certo)
+    await interaction.response.send_message(
+        "✅ **Sua solicitação foi enviada com sucesso!**\nNossa liderança irá avaliar seu perfil e você receberá um aviso no privado em breve.", 
+        ephemeral=True
+    )
 
 @bot.tree.command(name="limpar", description="Apaga mensagens do canal atual (Admin)")
 @app_commands.describe(quantidade="Número de mensagens para apagar", dias="Apagar mensagens anteriores a X dias")
