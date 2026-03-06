@@ -351,6 +351,22 @@ class GuerraView(discord.ui.View):
             # Se não lotou, apenas atualiza a mensagem e manda o aviso de punição no privado
             await interaction.response.edit_message(view=self)
             await interaction.followup.send("✅ **Inscrição Confirmada!**\n⚠️ **ATENÇÃO:** Se você não aparecer no horário marcado, receberá **MUTE**. Em caso de reincidência, será aplicado **WARN**.", ephemeral=True)
+
+    # --- BOTÃO SAIR / CANCELAR ---
+    @discord.ui.button(label="✖️ Sair da Fila", style=discord.ButtonStyle.red, custom_id="btn_guerra_sair")
+    async def sair(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user not in self.participantes:
+            return await interaction.response.send_message("❌ Você não está na lista de inscrição.", ephemeral=True)
+        
+        # Remove o usuário
+        self.participantes.remove(interaction.user)
+        
+        # Atualiza o botão de contagem (o primeiro botão da lista)
+        botao_participar = self.children[0] # Pega o botão verde pelo índice
+        botao_participar.label = f"⚔️ Participar ({len(self.participantes)}/12)"
+        
+        await interaction.response.edit_message(view=self)
+        await interaction.followup.send("🗑️ Você cancelou sua inscrição.", ephemeral=True)
         
 # --- VIEW PARA O MENU PEROXIDE ---
 class PeroxideView(discord.ui.View):
@@ -402,21 +418,6 @@ class PeroxideView(discord.ui.View):
             embed.add_field(name="📖 Wiki Fandom", value="[Acessar Wiki](https://peroxide-roblox.fandom.com/wiki/Peroxide_Wiki)", inline=False)
 
         await interaction.response.edit_message(embed=embed, view=self)
-    # --- BOTÃO SAIR / CANCELAR ---
-    @discord.ui.button(label="✖️ Sair da Fila", style=discord.ButtonStyle.red, custom_id="btn_guerra_sair")
-    async def sair(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user not in self.participantes:
-            return await interaction.response.send_message("❌ Você não está na lista de inscrição.", ephemeral=True)
-        
-        # Remove o usuário
-        self.participantes.remove(interaction.user)
-        
-        # Atualiza o botão de contagem (o primeiro botão da lista)
-        botao_participar = self.children[0] # Pega o botão verde pelo índice
-        botao_participar.label = f"⚔️ Participar ({len(self.participantes)}/12)"
-        
-        await interaction.response.edit_message(view=self)
-        await interaction.followup.send("🗑️ Você cancelou sua inscrição.", ephemeral=True)
 
 def converter_imagem_sync(input_path, output_path):
     with Image.open(input_path) as img:
@@ -451,7 +452,7 @@ def converter_video_gif_sync(video_path, gif_path):
         duracao = min(clip.duration, 5)
         final = clip.subclip(0, duracao)
         final.write_gif(gif_path, fps=12, logger=None, colors=128, opt="OptimizePlus")
-        
+
 # --- COMANDO SLASH ---
 @bot.tree.command(name="peroxide", description="Informações úteis sobre o jogo Peroxide")
 async def peroxide(interaction: discord.Interaction):
