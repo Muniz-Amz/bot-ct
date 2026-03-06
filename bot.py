@@ -697,7 +697,18 @@ class SolicitacaoView(discord.ui.View):
             content=f"👤 **Candidato:** {self.solicitante.mention} (`{self.nick_roblox}`)\n{texto_log}\n🛡️ **Responsável:** {interaction.user.mention}", 
             view=self
         )
-
+    @discord.ui.button(label="🔍 Verificar Pedido", style=discord.ButtonStyle.grey, custom_id="btn_verificar_pratico")
+    async def verificar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Gera o link de redirecionamento automático usando o Nick fornecido
+        link_perfil = f"https://www.roblox.com/users/profile?username={self.nick_roblox}"
+        
+        await interaction.response.send_message(
+            content=f"📑 **Painel de Verificação Rápida:**\n"
+                    f"**Nick:** `{self.nick_roblox}`\n"
+                    f"**Perfil:** [Clique para Abrir o Perfil]({link_perfil})\n"
+                    f"*Confira se ele solicitou entrada no grupo antes de aceitar!*",
+            ephemeral=True
+        )
     # 1. ACEITAR (Aprova no Roblox + Dá Cargo)
     @discord.ui.button(label="✅ Aceitar", style=discord.ButtonStyle.green, custom_id="btn_aceitar_final")
     async def aceitar(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -723,7 +734,7 @@ class SolicitacaoView(discord.ui.View):
         try:
             await self.solicitante.send("❌ **Aviso:** Sua solicitação para a **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi recusada no momento.")
         except: pass
-
+ 
     # 3. FALTOU PEDIDO NO ROBLOX (O que estava faltando!)
     @discord.ui.button(label="⚠️ Faltou Pedido", style=discord.ButtonStyle.secondary, custom_id="btn_faltou_final")
     async def faltou_pedido(self, interaction: discord.Interaction, button: discord.ui.Button):
