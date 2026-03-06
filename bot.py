@@ -351,7 +351,57 @@ class GuerraView(discord.ui.View):
             # Se não lotou, apenas atualiza a mensagem e manda o aviso de punição no privado
             await interaction.response.edit_message(view=self)
             await interaction.followup.send("✅ **Inscrição Confirmada!**\n⚠️ **ATENÇÃO:** Se você não aparecer no horário marcado, receberá **MUTE**. Em caso de reincidência, será aplicado **WARN**.", ephemeral=True)
+        
+# --- VIEW PARA O MENU PEROXIDE ---
+class PeroxideView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
 
+    @discord.ui.select(
+        placeholder="Selecione o que deseja consultar...",
+        options=[
+            discord.SelectOption(label="🌐 Servidores Oficiais (DC)", description="Gotei 13, Wandenreich, Las Noches...", emoji="🔗"),
+            discord.SelectOption(label="🏟️ Arenas Privadas", description="Lista de códigos para arenas", emoji="⚔️"),
+            discord.SelectOption(label="💰 Tabela de Valores (Trade)", description="Valores de troca de itens", emoji="📉"),
+            discord.SelectOption(label="📚 Wiki & Trello", description="Links para guias e informações", emoji="📖")
+        ]
+    )
+    async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
+        escolha = select.values[0]
+        embed = discord.Embed(color=discord.Color.blue())
+
+        if escolha == "🌐 Servidores Oficiais (DC)":
+            embed.title = "🌐 Servidores Oficiais do Peroxide"
+            embed.description = (
+                "**Gotei 13:** [Entrar](https://discord.gg/pEFDJke57G)\n"
+                "**Wandenreich:** [Entrar](https://discord.gg/g2g7YJzeva)\n"
+                "**✕cution:** [Entrar](https://discord.gg/QUJ3z28Bx7)\n"
+                "**Las Noches:** [Entrar](https://discord.gg/8dqU9rWqGw)\n\n"
+                "**Servidor Oficial Peroxide:** [Clique Aqui](https://discord.gg/WkS4UvmtFH)"
+            )
+
+        elif escolha == "🏟️ Arenas Privadas":
+            embed.title = "🏟️ Códigos de Arenas Privadas"
+            embed.description = (
+                "Copie e cole os códigos abaixo no jogo:\n\n"
+                "`YzP20tx2ioNU`\n`OsF8EVLjtvuv`\n`uCKibt4s4ODq`\n"
+                "`3HSbTOgt0MoB`\n`bFiQTRvskV6B`\n`WAFW0KpaanL2`"
+            )
+            embed.set_footer(text="Use com sabedoria para treinar!")
+
+        elif escolha == "💰 Tabela de Valores (Trade)":
+            embed.title = "💰 Lista de Valor de Troca"
+            embed.description = (
+                "Confira os valores atualizados dos itens para trocas:\n\n"
+                "🔗 [Planilha de Valores (Google Docs)](https://docs.google.com/spreadsheets/d/1-yzMInes6bUe35qenH1XGSnqCn9kDp62Bg9iYtfuOUs/edit?gid=0#gid=0)"
+            )
+
+        elif escolha == "📚 Wiki & Trello":
+            embed.title = "📚 Guias e Enciclopédias"
+            embed.add_field(name="📋 Trello Oficial", value="[Acessar Trello](https://trello.com/b/S9Uu73kt/peroxide-trello)", inline=False)
+            embed.add_field(name="📖 Wiki Fandom", value="[Acessar Wiki](https://peroxide-roblox.fandom.com/wiki/Peroxide_Wiki)", inline=False)
+
+        await interaction.response.edit_message(embed=embed, view=self)
     # --- BOTÃO SAIR / CANCELAR ---
     @discord.ui.button(label="✖️ Sair da Fila", style=discord.ButtonStyle.red, custom_id="btn_guerra_sair")
     async def sair(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -401,7 +451,19 @@ def converter_video_gif_sync(video_path, gif_path):
         duracao = min(clip.duration, 5)
         final = clip.subclip(0, duracao)
         final.write_gif(gif_path, fps=12, logger=None, colors=128, opt="OptimizePlus")
-
+        
+# --- COMANDO SLASH ---
+@bot.tree.command(name="peroxide", description="Informações úteis sobre o jogo Peroxide")
+async def peroxide(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="⚔️ Central de Informações Lost Souls - Peroxide",
+        description="Escolha uma opção no menu abaixo para acessar links, códigos de arena e tabelas.",
+        color=discord.Color.from_rgb(0, 0, 0)
+    )
+    # Espaço invisível para organizar o layout se precisar
+    embed.add_field(name="\u3164", value="Acesse o conteúdo oficial abaixo:", inline=False)
+    
+    await interaction.response.send_message(embed=embed, view=PeroxideView())
 # =========================
 # EVENTOS DO BOT
 # =========================
@@ -723,7 +785,7 @@ async def avaliacao(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
 
     # Lista de IDs dos seus avaliadores
-    avaliadores_ids = [1389503739018219571]
+    avaliadores_ids = [1389503739018219571,1046194613066678333,1017444684022427738]
     
     embed_aviso = discord.Embed(
         title="⚔️ Solicitação de Avaliação",
@@ -772,7 +834,7 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
     # Avisa o Discord que vai demorar (evita o bot cair no Render)
     await interaction.response.defer()
 
-    adms_ids = [1389503739018219571]
+    adms_ids = [1389503739018219571,1046194613066678333,1017444684022427738]
     cargos_id = []
     mencoes = " ".join([f"<@&{id_cargo}>" for id_cargo in cargos_id])
     link_grupo = "https://www.roblox.com/pt/communities/795234685/Lost-Sou-s#!/about"
