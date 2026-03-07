@@ -745,27 +745,6 @@ class SolicitacaoView(discord.ui.View):
             await self.solicitante.send(f"⚠️ **Olá!** Você ainda não enviou o pedido no grupo do Roblox!\n🔗 {link_grupo}")
         except: pass
 
-# --- COMANDO /SOLICITAR (VISUAL DAS IMAGENS) ---
-@bot.tree.command(name="solicitar", description="Pede aprovação na guilda e grupo")
-async def solicitar(interaction: discord.Interaction, nick_roblox: str):
-    canal_logs = bot.get_channel(ID_CANAL_LOGS)
-    if not canal_logs: return await interaction.response.send_message("❌ Erro: Canal de logs não encontrado.", ephemeral=True)
-
-    embed = discord.Embed(
-        title="🛡️ Nova Solicitação de Entrada",
-        description=f"O membro {interaction.user.mention} quer entrar na guilda.",
-        color=discord.Color.blue()
-    )
-    embed.add_field(name="👤 Nick no Roblox", value=f"`{nick_roblox}`", inline=True)
-    embed.add_field(name="🔗 Perfil", value=f"[Abrir Perfil](https://www.roblox.com/users/profile?username={nick_roblox})", inline=True)
-    embed.add_field(name="🛡️ Grupo", value=f"[Verificar Pedidos](https://www.roblox.com/communities/configure?id={ID_GRUPO_ROBLOX}#!/join-requests)", inline=False)
-    
-    embed.set_thumbnail(url=interaction.user.display_avatar.url) 
-    embed.set_footer(text="Lᴏsᴛ Sᴏᴜʟs 〔魂〕 - Sistema de Recrutamento")
-
-    view = SolicitacaoView(solicitante=interaction.user, nick_roblox=nick_roblox)
-    await canal_logs.send(content="🔔 **Nova solicitação pendente!**", embed=embed, view=view)
-    await interaction.response.send_message("✅ **Solicitação enviada com sucesso!**", ephemeral=True)
 # =========================
 # COMANDO /AVALIACAO
 # =========================
@@ -815,9 +794,8 @@ async def on_ready():
         
     print(f"✅ Bot logado como {bot.user}")
     print("🚀 Sistema de limpeza de 2 dias ativado!")
-# =========================
-# COMANDO /SOLICITAR
-# =========================
+
+# --- COMANDO /SOLICITAR (VISUAL DAS IMAGENS) ---
 @bot.tree.command(name="solicitar", description="Pede aprovação na guilda e grupo")
 async def solicitar(interaction: discord.Interaction, nick_roblox: str):
     canal_logs = bot.get_channel(ID_CANAL_LOGS)
