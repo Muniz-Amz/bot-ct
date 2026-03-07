@@ -728,7 +728,7 @@ class SolicitacaoView(discord.ui.View):
             await self.solicitante.send(f"🎉 **Parabéns!** Sua entrada na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi **ACEITA**!")
         except: pass
 
-    # BOTÃO 3: RECUSAR (DM DE AVISO)
+    # BOTÃO 3: RECUSAR (DM DE AVIS09O)
     @discord.ui.button(label="Recusar", style=discord.ButtonStyle.red, emoji="❌", custom_id="btn_recusar_final")
     async def recusar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.finalizar_painel(interaction, "❌ **Solicitação Recusada.**", discord.Color.red())
