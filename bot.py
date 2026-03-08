@@ -820,7 +820,7 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
 
     view = SolicitacaoView(solicitante=interaction.user, nick_roblox=nick_roblox)
     await canal_logs.send(content="🔔 **Nova solicitação pendente!**", embed=embed, view=view)
-    await interaction.response.send_message("✅ **Solicitação enviada com sucesso!**", ephemeral=True)
+    await canal_logs.send(content=f"🔔 **Nova solicitação pendente!**\n{pings}", embed=embed, view=view)
 
 # --- COMANDO /LIMPAR ---
 @bot.tree.command(name="limpar", description="Apaga mensagens do canal")
