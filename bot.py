@@ -796,11 +796,16 @@ async def on_ready():
     print("🚀 Sistema de limpeza de 2 dias ativado!")
 
 # --- COMANDO /SOLICITAR (VISUAL DAS IMAGENS) ---
+STAFF_1 = 1389503739018219571 
+STAFF_2 = 1046194613066678333
+STAFF_3 = 1017444684022427738
+
 @bot.tree.command(name="solicitar", description="Pede aprovação na guilda e grupo")
 async def solicitar(interaction: discord.Interaction, nick_roblox: str):
     canal_logs = bot.get_channel(ID_CANAL_LOGS)
     if not canal_logs: return await interaction.response.send_message("❌ Erro: Canal de logs não encontrado.", ephemeral=True)
-
+    
+    pings = f"<@{STAFF_1}> <@{STAFF_2}> <@{STAFF_3}>"
     embed = discord.Embed(
         title="🛡️ Nova Solicitação de Entrada",
         description=f"O membro {interaction.user.mention} quer entrar na guilda.",
