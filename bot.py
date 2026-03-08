@@ -802,10 +802,15 @@ STAFF_3 = 1017444684022427738
 
 @bot.tree.command(name="solicitar", description="Pede aprovação na guilda e grupo")
 async def solicitar(interaction: discord.Interaction, nick_roblox: str):
+    # 1. RESPONDE AO USUÁRIO PRIMEIRO PARA EVITAR O ERRO
+    await interaction.response.send_message("✅ **Solicitação enviada com sucesso! Aguarde a avaliação da Staff.**", ephemeral=True)
+
     canal_logs = bot.get_channel(ID_CANAL_LOGS)
-    if not canal_logs: return await interaction.response.send_message("❌ Erro: Canal de logs não encontrado.", ephemeral=True)
+    if not canal_logs: 
+        return print("❌ Erro: Canal de logs não encontrado.")
     
     pings = f"<@{STAFF_1}> <@{STAFF_2}> <@{STAFF_3}>"
+    
     embed = discord.Embed(
         title="🛡️ Nova Solicitação de Entrada",
         description=f"O membro {interaction.user.mention} quer entrar na guilda.",
@@ -819,7 +824,8 @@ async def solicitar(interaction: discord.Interaction, nick_roblox: str):
     embed.set_footer(text="Lᴏsᴛ Sᴏᴜʟs 〔魂〕 - Sistema de Recrutamento")
 
     view = SolicitacaoView(solicitante=interaction.user, nick_roblox=nick_roblox)
-    await canal_logs.send(content="🔔 **Nova solicitação pendente!**", embed=embed, view=view)
+    
+    # 2. DEIXA APENAS ESTE ENVIO PARA O CANAL DE LOGS (Com os pings)
     await canal_logs.send(content=f"🔔 **Nova solicitação pendente!**\n{pings}", embed=embed, view=view)
 
 # --- COMANDO /LIMPAR ---
