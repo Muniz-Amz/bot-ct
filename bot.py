@@ -468,31 +468,60 @@ async def on_member_join(member):
 
 @bot.tree.command(name="help", description="Mostra a lista completa de comandos e como usá-los")
 async def help_cmd(interaction: discord.Interaction):
+    link_logo = "https://media.discordapp.net/attachments/1478217477916987496/1479116565822570496/19_Sem_Titulo_20260304183425.png"
+    
     embed = discord.Embed(
         title="📚 Central de Ajuda - Lost Bot",
-        description="Aqui estão todos os comandos disponíveis para os membros da Comunidade:",
+        description="Gerencie sua jornada na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** com nossos comandos oficiais.",
         color=discord.Color.blue()
     )
-    
+
+    # --- GESTÃO DE GUILDA ---
     embed.add_field(
-        name="⚔️ EVENTOS E COMUNIDADE", 
-        value="`/agendar_guerra` - Cria um painel de inscrição para 12 pessoas.\n`/logo` - Informações e link oficial do grupo.\n`/regras` - Exibe as leis do servidor.\n`/solicitar` - Pede aprovação no grupo do Roblox.", 
+        name="🛡️ Gestão de Guilda", 
+        value=(
+            "`/regras` - Exibe as leis do servidor, jogo e punições.\n"
+            "`/peroxide` - Central de links, arenas e guia de trade.\n"
+            "`/logo` - Mostra a identidade visual e link do grupo.\n"
+            "`/ally` - Consulta a logo e link de guildas aliadas."
+        ), 
         inline=False
     )
-    
+
+    # --- EVENTOS E PVP ---
     embed.add_field(
-        name="🎬 FERRAMENTAS DE MÍDIA", 
-        value="`/videogif` - Converte vídeo para GIF nítido.\n`/videoaudio` - Extrai MP3 de um vídeo.\n`/gifct` - Converte imagem para GIF.", 
+        name="⚔️ Eventos & PvP", 
+        value=(
+            "`/agendar_guerra` - Painel de inscrição (12 vagas) com sorteio.\n"
+            "`/solicitar` - Solicitar entrada no grupo do Roblox."
+        ), 
         inline=False
     )
-    
+
+    # --- FERRAMENTAS DE MÍDIA ---
     embed.add_field(
-        name="🔧 SISTEMA", 
-        value="`/ping` - Verifica a latência do bot.\n`!deploy` - Sincroniza comandos (Admin).", 
+        name="🎬 Ferramentas de Mídia", 
+        value=(
+            "`/videogif` - Converte vídeos curtos em GIF.\n"
+            "`/videoaudio` - Extrai o áudio (MP3) de vídeos.\n"
+            "`/gifs` - Converte PNG para GIF nítido (HQ)."
+        ), 
         inline=False
     )
-    
-    embed.set_footer(text="🛡️ Lᴏsᴛ Sᴏᴜʟs 〔魂〕", icon_url="https://media.discordapp.net/attachments/1478217477916987496/1479116565822570496/19_Sem_Titulo_20260304183425.png?ex=69aade25&is=69a98ca5&hm=8c577fb81726bd0b1c856f00bacfe5caef3e3e4e326fc6964f7c6b9440a7eef2&=&format=webp&quality=lossless&width=950&height=950")
+
+    # --- SISTEMA ---
+    embed.add_field(
+        name="🔧 Sistema", 
+        value="`/ping` - Latência do bot.\n`!deploy` - Sincroniza comandos (Admin).", 
+        inline=False
+    )
+
+    embed.set_thumbnail(url=link_logo)
+    embed.set_footer(
+        text=f"Solicitado por {interaction.user.name} • Lᴏsᴛ Sᴏᴜʟs 〔魂〕", 
+        icon_url=interaction.user.display_avatar.url
+    )
+
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="ping", description="Verifica a latência atual do bot")
