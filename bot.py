@@ -673,47 +673,6 @@ async def ally(interaction: discord.Interaction, nome: str, id_grupo: str):
 
     # Followup é obrigatório após o defer
     await interaction.followup.send(embed=embed)
-    
-@bot.tree.command(name="videoaudio", description="Converte um vídeo para arquivo de áudio MP3")
-async def videoaudio(interaction: Interaction, arquivo: discord.Attachment):
-    await interaction.response.defer()
-    v_path, a_path = f"v_{uuid.uuid4()}.mp4", f"a_{uuid.uuid4()}.mp3"
-    try:
-        await arquivo.save(v_path)
-        await asyncio.to_thread(extrair_audio_sync, v_path, a_path)
-        await interaction.followup.send(file=discord.File(a_path))
-    except Exception:
-        await interaction.followup.send("❌ Erro ao extrair áudio.")
-    finally:
-        for p in (v_path, a_path):
-            if os.path.exists(p): os.remove(p)
-
-@bot.tree.command(name="gifs", description="Converte PNG para um GIF idêntico e nítido")
-async def gifct(interaction: discord.Interaction, arquivo: discord.Attachment):
-    await interaction.response.defer()
-    
-    # Geramos nomes únicos para não dar conflito de arquivos no Render
-    i_path = f"input_{uuid.uuid4()}.png"
-    o_path = f"output_{uuid.uuid4()}.gif"
-    
-    try:
-        await arquivo.save(i_path)
-        
-        # Executa a conversão usando a função acima
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, converter_imagem_sync, i_path, o_path)
-        
-        # Envia o GIF que agora está IGUAL à PNG
-        await interaction.followup.send(file=discord.File(o_path))
-        
-    except Exception as e:
-        print(f"Erro no GIF: {e}")
-        await interaction.followup.send("❌ Erro ao converter para GIF.")
-    finally:
-        # Limpa os arquivos temporários para o Render não encher
-        for p in (i_path, o_path):
-            if os.path.exists(p): 
-                os.remove(p)
 
 @bot.tree.command(name="regras", description="Exibe as leis fundamentais da Lᴏsᴛ Sᴏᴜʟs 〔魂〕 (Servidor e Jogo)")
 async def regras(interaction: discord.Interaction):
