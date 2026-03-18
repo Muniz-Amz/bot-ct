@@ -4,18 +4,18 @@ from discord.ext import commands, tasks
 from PIL import Image
 import os
 import uuid
-from flask import Flask
-from threading import Thread
 import asyncio
 import logging
 import random
-from moviepy.editor import VideoFileClip
 import time
-from datetime import datetime, timezone, timedelta
 import aiohttp
-import discord
-from discord import app_commands
 import io
+from flask import Flask
+from threading import Thread
+from moviepy.editor import VideoFileClip
+from datetime import datetime, timezone, timedelta
+
+# ... (Configurações de Log, Token e Ranks PVP) ...
 
 # =========================
 # CONFIGURAÇÕES DE LOG E TOKEN
@@ -580,19 +580,67 @@ async def agendar_guerra(interaction: Interaction, data: str, horario: str, imag
 @bot.tree.command(name="videogif", description="Converte um vídeo para GIF (máximo 5 segundos)")
 async def videogif(interaction: Interaction, arquivo: discord.Attachment):
     if not arquivo.content_type.startswith("video"): 
-        return await interaction.response.send_message("❌ Por favor, envie um arquivo de vídeo!")
+        return await interaction.response.send_message("❌ Por favor, envie um arquivo de vídeo!", ephemeral=True)
     
     await interaction.response.defer()
     v_path, g_path = f"v_{uuid.uuid4()}.mp4", f"g_{uuid.uuid4()}.gif"
     try:
         await arquivo.save(v_path)
+        # O uso do asyncio.to_thread é essencial para o Render não travar
         await asyncio.to_thread(converter_video_gif_sync, v_path, g_path)
-        await interaction.followup.send(file=discord.File(g_path))
-    except Exception:
+        
+        # CORREÇÃO: filename="resultado.gif" força o Discord a mostrar a imagem aberta
+        await interaction.followup.send(file=discord.File(g_path, filename="resultado.gif"))
+    except Exception as e:
+        print(f"Erro videogif: {e}")
         await interaction.followup.send("❌ Erro ao converter o vídeo.")
     finally:
         for p in (v_path, g_path):
             if os.path.exists(p): os.remove(p)
+
+@bot.tree.command(name="videoaudio", description="Converte um vídeo para arquivo de áudio MP3")
+async def videoaudio(interaction: Interaction, arquivo: discord.Attachment):
+    if not arquivo.content_type.startswith("video"):
+        return await interaction.response.send_message("❌ Envie um arquivo de vídeo!", ephemeral=True)
+
+    await interaction.response.defer()
+    v_path, a_path = f"v_{uuid.uuid4()}.mp4", f"a_{uuid.uuid4()}.mp3"
+    try:
+        await arquivo.save(v_path)
+        # Isso resolve o erro "extrair_audio_sync is not defined" se a função estiver acima
+        await asyncio.to_thread(extrair_audio_sync, v_path, a_path)
+        
+        # CORREÇÃO: filename="audio.mp3" permite ouvir direto no player do Discord
+        await interaction.followup.send(file=discord.File(a_path, filename="audio.mp3"))
+    except Exception as e:
+        print(f"Erro videoaudio: {e}")
+        await interaction.followup.send("❌ Erro ao extrair áudio.")
+    finally:
+        for p in (v_path, a_path):
+            if os.path.exists(p): os.remove(p)
+
+@bot.tree.command(name="gifs", description="Converte PNG para um GIF idêntico e nítido")
+async def gifct(interaction: discord.Interaction, arquivo: discord.Attachment):
+    await interaction.response.defer()
+    
+    i_path = f"input_{uuid.uuid4()}.png"
+    o_path = f"output_{uuid.uuid4()}.gif"
+    
+    try:
+        await arquivo.save(i_path)
+        # Usando to_thread para manter consistência com os outros comandos
+        await asyncio.to_thread(converter_imagem_sync, i_path, o_path)
+        
+        # CORREÇÃO: filename="imagem.gif" resolve o problema do link azul (print image_5f3ce1.png)
+        await interaction.followup.send(file=discord.File(o_path, filename="resultado.gif"))
+        
+    except Exception as e:
+        print(f"Erro no GIF: {e}")
+        await interaction.followup.send("❌ Erro ao converter para GIF.")
+    finally:
+        for p in (i_path, o_path):
+            if os.path.exists(p): 
+                os.remove(p)
 
 # =========================
 # COMANDO: ALLY COM CACHE BREAK (FIXED)
