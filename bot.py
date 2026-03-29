@@ -1,4 +1,5 @@
-import discordmoviepy.editor
+
+import discord
 from discord import app_commands, Interaction
 from discord.ext import commands, tasks
 from PIL import Image
@@ -12,6 +13,7 @@ import aiohttp
 import io
 from flask import Flask
 from threading import Thread
+import moviepy.editor as mp
 from moviepy.editor import VideoFileClip
 from datetime import datetime, timezone, timedelta
 
