@@ -1,4 +1,4 @@
-import discord
+import discordmoviepy.editor
 from discord import app_commands, Interaction
 from discord.ext import commands, tasks
 from PIL import Image
@@ -336,8 +336,8 @@ class PeroxideView(discord.ui.View):
                 "**Wandenreich:** [Entrar](https://discord.gg/g2g7YJzeva)\n"
                 "**✕cution:** [Entrar](https://discord.gg/QUJ3z28Bx7)\n"
                 "**Las Noches:** [Entrar](https://discord.gg/8dqU9rWqGw)\n\n"
-                "**Servidor Oficial Peroxide:** [Clique Aqui](https://discord.gg/WkS4UvmtFH)"
-                "**Peroxide Support:** [Clique Aqui](https://discord.gg/9RFa6k7ra)"
+                "**Servidor Oficial Peroxide:** [Clique Aqui](https://discord.gg/WkS4UvmtFH)\n"
+                "**Peroxide Support:** [Clique Aqui](https://discord.gg/9RFa6k7ra)\n"
             )
 
         elif escolha == "🏟️ Arenas Privadas":
