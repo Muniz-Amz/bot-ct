@@ -337,6 +337,7 @@ class PeroxideView(discord.ui.View):
                 "**✕cution:** [Entrar](https://discord.gg/QUJ3z28Bx7)\n"
                 "**Las Noches:** [Entrar](https://discord.gg/8dqU9rWqGw)\n\n"
                 "**Servidor Oficial Peroxide:** [Clique Aqui](https://discord.gg/WkS4UvmtFH)"
+                "**Peroxide Support:** [Clique Aqui](https://discord.gg/9RFa6k7ra)"
             )
 
         elif escolha == "🏟️ Arenas Privadas":
@@ -879,7 +880,6 @@ async def limpar(interaction: discord.Interaction, quantidade: int = 100):
 CANAIS_PARA_LIMPAR = [
     1478852029073063936, # Ex: Canal de Solicitações
     1478851893319962794, # Ex: Canal de Logs
-    1478215814598365204,
     1478901434425806941,
     1478901345963479131  
 ]
