@@ -1,4 +1,3 @@
-
 import discord
 from discord import app_commands, Interaction
 from discord.ext import commands, tasks
@@ -11,23 +10,46 @@ import random
 import time
 import aiohttp
 import io
-from flask import Flask
+import pymongo  # Nova ferramenta para o banco
+from flask import Flask, jsonify, request
+from flask_cors import CORS
 from threading import Thread
-import moviepy.editor as mp
 from moviepy.editor import VideoFileClip
 from datetime import datetime, timezone, timedelta
-from flask import Flask, jsonify
-from flask_cors import CORS
-# ... (Configurações de Log, Token e Ranks PVP) ...
 
+# =========================
+# CONFIGURAÇÕES DE LOG E BANCO
+# =========================
+logging.basicConfig(level=logging.INFO)
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 # =========================
 # CONFIGURAÇÕES DE LOG E TOKEN
 # =========================
 logging.basicConfig(level=logging.INFO)
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
+MONGO_URL = os.getenv("MONGO_URL")
+cluster = pymongo.MongoClient(MONGO_URL)
+db = cluster["amz_database"]
+collection = db["config_limpeza"]
 
-# Dicionário de Ranks para consulta do Bot
+CONFIG_LIMPEZA_DINAMICA = {}
+
+def carregar_configs_banco():
+    """Busca as configurações no MongoDB e as coloca na memória do bot"""
+    global CONFIG_LIMPEZA_DINAMICA
+    try:
+        # Busca todos os documentos na coleção do banco
+        dados = collection.find({})
+        for item in dados:
+            # Converte para garantir que ID seja número e Dias também
+            canal_id = int(item["canal_id"])
+            dias = int(item["dias"])
+            CONFIG_LIMPEZA_DINAMICA[canal_id] = dias
+            
+        print(f"📁 [AMZ] {len(CONFIG_LIMPEZA_DINAMICA)} canais carregados do Banco de Dados!")
+    except Exception as e:
+        print(f"❌ Erro ao acessar o MongoDB: {e}")
 
 # ==========================
 # SISTEMA KEEP ALIVE (FLASK)
@@ -35,10 +57,33 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 app = Flask(__name__)
 CORS(app)
 
-
 @app.route("/")
 def home():
     return "🛡️ Souls Bot - Sistema de Guerra Online!"
+
+# --- ESSA É A PARTE NOVA QUE VAI DENTRO DO SEU BLOCO ---
+@app.route('/api/configurar-limpeza', methods=['POST'])
+def configurar_limpeza_api():
+    global CONFIG_LIMPEZA_DINAMICA
+    dados = request.json
+    try:
+        c_id = int(dados.get('canal_id'))
+        dias = int(dados.get('dias'))
+        
+        if 1 <= dias <= 7:
+            # Salva no MongoDB
+            collection.update_one(
+                {"canal_id": c_id}, 
+                {"$set": {"dias": dias}}, 
+                upsert=True
+            )
+            # Atualiza a memória imediata do bot
+            CONFIG_LIMPEZA_DINAMICA[c_id] = dias
+            return jsonify({"status": "sucesso"}), 200
+        return jsonify({"status": "erro", "msg": "Use entre 1 e 7 dias"}), 400
+    except Exception as e:
+        return jsonify({"status": "erro", "msg": str(e)}), 400
+# -------------------------------------------------------
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -50,7 +95,6 @@ def keep_alive():
     t.start()
 
 keep_alive()
-
 # =========================
 # CONFIGURAÇÃO DO BOT
 # =========================
@@ -215,7 +259,7 @@ async def help_cmd(interaction: discord.Interaction):
             "`/videogif` - Converte vídeos curtos em GIF.\n"
             "`/videoaudio` - Extrai o áudio (MP3) de vídeos.\n"
             "`/gifs` - Converte PNG para GIF nítido (HQ)."
-        ), 
+        ),  
         inline=False
     )
 
@@ -234,7 +278,34 @@ async def ping(interaction: Interaction):
     await interaction.response.send_message(f"🏓 **Pong!** `{round(bot.latency * 1000)}ms`")
 
 
-# --- Comandos de Mídia ---
+                # --- Comandos de Limpeza ---
+
+@tasks.loop(hours=1)
+async def motor_limpeza_amz():
+    """Verifica todos os canais configurados e apaga mensagens antigas"""
+    agora = datetime.now(timezone.utc)
+    
+    #list() evita erros se o dicionário mudar enquanto o loop roda
+    for canal_id, dias in list(CONFIG_LIMPEZA_DINAMICA.items()):
+        canal = bot.get_channel(canal_id)
+        
+        if canal:
+            try:
+                # Calcula o tempo limite (ex: agora menos 3 dias)
+                limite = agora - timedelta(days=dias)
+                
+                # O purge apaga mensagens antes da data limite
+                # O check garante que mensagens FIXADAS não sejam apagadas
+                deleted = await canal.purge(before=limite, check=lambda m: not m.pinned)
+                
+                if len(deleted) > 0:
+                    print(f"🧹 [AMZ] Limpeza concluída: {len(deleted)} mensagens removidas no canal {canal_id}")
+            except Exception as e:
+                print(f"❌ Erro ao limpar canal {canal_id}: {e}")
+
+
+                # --- Comandos de Mídia ---
+
 
 @bot.tree.command(name="videogif", description="Converte um vídeo para GIF (máximo 5 segundos)")
 async def videogif(interaction: Interaction, arquivo: discord.Attachment):
@@ -300,7 +371,21 @@ async def gifct(interaction: discord.Interaction, arquivo: discord.Attachment):
         for p in (i_path, o_path):
             if os.path.exists(p): 
                 os.remove(p)
+@bot.event
+async def on_ready():
+    # 1. Carrega as configurações do MongoDB para a memória do bot
+    carregar_configs_banco() 
+    
+    # 2. Inicia o motor de limpeza se ele ainda não estiver rodando
+    if not motor_limpeza_amz.is_running():
+        motor_limpeza_amz.start()
+        
+    print(f"✅ Bot logado com sucesso como {bot.user}")
+    print("👉 Use !deploy no Discord para atualizar os comandos Slash.")
 
+# =========================
+# MOTOR DE LIMPEZA AUTOMÁTICA
+# =========================
 
 
 @bot.command()
