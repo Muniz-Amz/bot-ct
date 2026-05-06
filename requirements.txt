@@ -6,3 +6,5 @@ decorator==4.4.2
 proglog==0.1.10
 aiohttp
 flask-cors
+pymongo
+dnspython

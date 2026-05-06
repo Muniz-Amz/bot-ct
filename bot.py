@@ -199,7 +199,7 @@ async def help_cmd(interaction: discord.Interaction):
 
     # --- GESTÃO DE GUILDA ---
     embed.add_field(
-        name="🛡️ Gestão de Guilda", 
+        name="🛡️ Games", 
         value=(
           
             "`/peroxide` - Central de links, arenas e guia de trade.\n"
