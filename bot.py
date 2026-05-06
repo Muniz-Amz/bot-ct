@@ -16,7 +16,8 @@ from threading import Thread
 import moviepy.editor as mp
 from moviepy.editor import VideoFileClip
 from datetime import datetime, timezone, timedelta
-
+from flask import Flask, jsonify
+from flask_cors import CORS
 # ... (Configurações de Log, Token e Ranks PVP) ...
 
 # =========================
@@ -24,21 +25,16 @@ from datetime import datetime, timezone, timedelta
 # =========================
 logging.basicConfig(level=logging.INFO)
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-ID_CANAL_LOG_AVALIACAO = 1479114414098485383
+
 
 # Dicionário de Ranks para consulta do Bot
-RANKS_PVP = {
-    "1": 1434373467104481300,
-    "2": 1299983374047252560,
-    "3": 1317543532910612541,
-    "4": 1314695358294790244,
-    "5": 1317557856077348905,
-    "6": 1434428766435938416
-}
+
 # ==========================
 # SISTEMA KEEP ALIVE (FLASK)
 # ==========================
 app = Flask(__name__)
+CORS(app)
+
 
 @app.route("/")
 def home():
@@ -63,256 +59,7 @@ intents.message_content = True
 intents.members = True          
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
-# Travas independentes
-agendados_recentemente = set()
-avaliados_recentemente = set()
 
-# ------------------------------------------
-# MODAL 1: APENAS PARA AGENDAR A LUTA
-# ------------------------------------------
-class AgendarModal(discord.ui.Modal, title='Agendar Arena'):
-    def __init__(self, candidato_id: int):
-        super().__init__()
-        self.candidato_id = candidato_id
-
-    data_hora = discord.ui.TextInput(
-        label='Data e Horário',
-        placeholder='Ex: Hoje às 18:00',
-        style=discord.TextStyle.short,
-        required=True
-    )
-
-    codigo_arena = discord.ui.TextInput(
-        label='Código da Arena (PS)',
-        placeholder='Ex: ARENA-XYZ',
-        style=discord.TextStyle.short,
-        required=True
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        # Ganha tempo para processar logs e DMs
-        await interaction.response.defer(ephemeral=True)
-        
-        ID_DO_SERVIDOR = 1358951916004184212
-        guild = interaction.client.get_guild(ID_DO_SERVIDOR)
-        
-        if not guild:
-            return await interaction.followup.send("❌ Erro: Servidor não encontrado.")
-
-        try:
-            membro = guild.get_member(self.candidato_id) or await guild.fetch_member(self.candidato_id)
-        except:
-            return await interaction.followup.send("❌ Membro não encontrado.")
-
-        # Log de Agendamento
-        canal_log = interaction.client.get_channel(ID_CANAL_LOG_AVALIACAO)
-        if canal_log:
-            embed_log = discord.Embed(title="📅 Log de Agendamento PvP", color=discord.Color.blue(), timestamp=datetime.now())
-            embed_log.add_field(name="👤 Candidato", value=f"{membro.mention}", inline=True)
-            embed_log.add_field(name="🛡️ Avaliador", value=f"{interaction.user.mention}", inline=True)
-            embed_log.add_field(name="⏰ Marcado para", value=f"`{self.data_hora.value}`", inline=False)
-            embed_log.add_field(name="🔑 Arena", value=f"`{self.codigo_arena.value}`", inline=False)
-            await canal_log.send(embed=embed_log)
-
-        # DM para o Jogador
-        try:
-            embed_jogador = discord.Embed(title="⚔️ Teste PvP Agendado!", color=discord.Color.blue())
-            embed_jogador.description = f"Seu teste foi marcado pelo avaliador {interaction.user.mention}."
-            embed_jogador.add_field(name="📅 Horário", value=f"`{self.data_hora.value}`", inline=False)
-            embed_jogador.add_field(name="🎮 Arena", value=f"`{self.codigo_arena.value}`", inline=False)
-            await membro.send(embed=embed_jogador)
-        except:
-            pass
-
-        agendados_recentemente.add(self.candidato_id)
-        await interaction.followup.send(f"✅ Arena marcada para {membro.name}!")
-
-# ------------------------------------------
-# MODAL 2: APENAS PARA DAR O RESULTADO/CARGO
-# ------------------------------------------
-class ResultadoModal(discord.ui.Modal, title='Definir Resultado'):
-    def __init__(self, candidato_id: int):
-        super().__init__()
-        self.candidato_id = candidato_id
-
-    rank_conquistado = discord.ui.TextInput(
-        label='Rank Conquistado',
-        placeholder='Ex: Anjo, Serafim, Querubim...',
-        style=discord.TextStyle.short,
-        required=True
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        # --- BLOQUEIO DE SEGURANÇA ---
-        # Verifica se enquanto o avaliador preenchia o modal, outro já terminou o processo
-        if self.candidato_id in avaliados_recentemente:
-            return await interaction.response.send_message(
-                "⚠️ **CONFLITO:** Outro avaliador já registrou o resultado para este jogador enquanto você preenchia o formulário.", 
-                ephemeral=True
-            )
-
-        # ESSENCIAL: Avisa ao Discord que o bot está trabalhando (evita timeout de 3s)
-        await interaction.response.defer(ephemeral=True)
-        
-        ID_DO_SERVIDOR = 1358951916004184212
-        guild = interaction.client.get_guild(ID_DO_SERVIDOR)
-        
-        try:
-            # Tenta pegar o membro do cache ou buscar no servidor
-            membro = guild.get_member(self.candidato_id) or await guild.fetch_member(self.candidato_id)
-        except Exception as e:
-            return await interaction.followup.send(f"❌ Erro ao localizar membro: {e}")
-
-        rank_texto = self.rank_conquistado.value.upper().strip()
-
-        if rank_texto in RANKS_PVP:
-            id_cargo = RANKS_PVP[rank_texto]
-            cargo_obj = guild.get_role(id_cargo)
-            
-            if cargo_obj:
-                try:
-                    # Coleta todos os cargos de rank que o membro possui atualmente para remoção
-                    cargos_atuais = [
-                        guild.get_role(rid) for rname, rid in RANKS_PVP.items() 
-                        if guild.get_role(rid) in membro.roles
-                    ]
-                    
-                    if cargos_atuais:
-                        await membro.remove_roles(*cargos_atuais)
-                    
-                    # Adiciona o novo cargo conquistado
-                    await membro.add_roles(cargo_obj)
-                    
-                    # Log detalhado no canal de logs
-                    canal_log = interaction.client.get_channel(ID_CANAL_LOG_AVALIACAO)
-                    if canal_log:
-                        embed_log = discord.Embed(
-                            title="🏆 Resultado de Avaliação PvP",
-                            color=discord.Color.green(),
-                            timestamp=datetime.now()
-                        )
-                        embed_log.add_field(name="👤 Jogador", value=f"{membro.mention} (`{membro.id}`)", inline=True)
-                        embed_log.add_field(name="🛡️ Avaliador", value=f"{interaction.user.mention}", inline=True)
-                        embed_log.add_field(name="📈 Novo Rank", value=f"**{cargo_obj.name}**", inline=False)
-                        await canal_log.send(embed=embed_log)
-                    
-                    # Tenta avisar o jogador no privado (DM)
-                    try:
-                        await membro.send(f"🏆 Parabéns! Seu novo rank na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** é: **{cargo_obj.name}**!")
-                    except discord.Forbidden:
-                        print(f"Não foi possível enviar DM para {membro.name}")
-                    
-                    # --- FINALIZAÇÃO DA TRAVA ---
-                    # Adiciona o ID ao set apenas após o sucesso da operação
-                    avaliados_recentemente.add(self.candidato_id)
-                    
-                    await interaction.followup.send(f"✅ Sucesso! O jogador {membro.name} foi atualizado para {cargo_obj.name}.")
-                
-                except discord.Forbidden:
-                    await interaction.followup.send("❌ Erro de Permissão: O cargo do bot deve estar ACIMA dos cargos de Rank na hierarquia do servidor.")
-                except Exception as e:
-                    await interaction.followup.send(f"❌ Ocorreu um erro inesperado: {e}")
-            else:
-                await interaction.followup.send("❌ Erro: Cargo não encontrado no servidor (ID inválido).")
-        else:
-            await interaction.followup.send(f"❌ O rank `{rank_texto}` não foi reconhecido. Verifique a ortografia.")
-# ------------------------------------------
-# A VIEW COM OS DOIS BOTÕES
-# ------------------------------------------
-class AvaliacaoView(discord.ui.View):
-    def __init__(self, candidato_id: int):
-        super().__init__(timeout=None) 
-        self.candidato_id = candidato_id
-
-    @discord.ui.button(label="📅 1. Agendar Arena", style=discord.ButtonStyle.primary, custom_id="btn_agendar")
-    async def agendar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # TRAVA: Se o ID já estiver nos agendados, barra o segundo avaliador na hora
-        if self.candidato_id in agendados_recentemente:
-            return await interaction.response.send_message("⚠️ Outro avaliador já assumiu esta arena!", ephemeral=True)
-            
-        await interaction.response.send_modal(AgendarModal(candidato_id=self.candidato_id))
-
-    @discord.ui.button(label="🏆 2. Definir Resultado", style=discord.ButtonStyle.success, custom_id="btn_resultado")
-    async def resultado(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.candidato_id in avaliados_recentemente:
-            return await interaction.response.send_message("⚠️ Este resultado já foi registrado!", ephemeral=True)
-        
-        await interaction.response.send_modal(ResultadoModal(candidato_id=self.candidato_id))
-
-# =========================
-# SISTEMA DE GUERRA (LOGICA ATUALIZADA)
-# =========================
-class GuerraView(discord.ui.View):
-    def __init__(self, imagem_url):
-        super().__init__(timeout=None)
-        self.participantes = []
-        self.imagem_url = imagem_url
-
-    # --- BOTÃO ENTRAR ---
-    @discord.ui.button(label="⚔️ Participar (0/12)", style=discord.ButtonStyle.green, custom_id="btn_guerra_entrar")
-    async def participar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Verifica se já está na lista
-        if interaction.user in self.participantes:
-            return await interaction.response.send_message("❌ Você já está na lista!", ephemeral=True)
-        
-        # Verifica se está cheio
-        if len(self.participantes) >= 12:
-            return await interaction.response.send_message("❌ A guerra já está cheia!", ephemeral=True)
-
-        # Adiciona o usuário
-        self.participantes.append(interaction.user)
-        
-        # Atualiza o texto do botão
-        button.label = f"⚔️ Participar ({len(self.participantes)}/12)"
-        
-        # Lógica de Sorteio (quando bater 12)
-        if len(self.participantes) == 12:
-            random.shuffle(self.participantes)
-            time_a = self.participantes[:6]
-            time_b = self.participantes[6:]
-            
-            embed_times = discord.Embed(title="🔥 TIMES SORTEADOS!", color=discord.Color.dark_red())
-            embed_times.description = "A guerra vai começar! Organizem-se nos canais de voz."
-            
-            lista_a = "\n".join([f"👤 {u.mention}" for u in time_a])
-            embed_times.add_field(name="🔵 TIME 1", value=lista_a, inline=True)
-            
-            lista_b = "\n".join([f"👤 {u.mention}" for u in time_b])
-            embed_times.add_field(name="🔴 TIME 2", value=lista_b, inline=True)
-            
-            if self.imagem_url:
-                embed_times.set_image(url=self.imagem_url)
-            
-            # Tranca TODOS os botões
-            for child in self.children:
-                child.disabled = True
-            
-            button.label = "⛔ INSCRIÇÕES ENCERRADAS"
-            button.style = discord.ButtonStyle.grey
-            
-            await interaction.response.edit_message(view=self)
-            await interaction.channel.send(content="🚨 **ATENÇÃO GUERREIROS! TIMES DEFINIDOS!**", embed=embed_times)
-        else:
-            # Se não lotou, apenas atualiza a mensagem e manda o aviso de punição no privado
-            await interaction.response.edit_message(view=self)
-            await interaction.followup.send("✅ **Inscrição Confirmada!**\n⚠️ **ATENÇÃO:** Se você não aparecer no horário marcado, receberá **MUTE**. Em caso de reincidência, será aplicado **WARN**.", ephemeral=True)
-
-    # --- BOTÃO SAIR / CANCELAR ---
-    @discord.ui.button(label="✖️ Sair da Fila", style=discord.ButtonStyle.red, custom_id="btn_guerra_sair")
-    async def sair(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user not in self.participantes:
-            return await interaction.response.send_message("❌ Você não está na lista de inscrição.", ephemeral=True)
-        
-        # Remove o usuário
-        self.participantes.remove(interaction.user)
-        
-        # Atualiza o botão de contagem (o primeiro botão da lista)
-        botao_participar = self.children[0] # Pega o botão verde pelo índice
-        botao_participar.label = f"⚔️ Participar ({len(self.participantes)}/12)"
-        
-        await interaction.response.edit_message(view=self)
-        await interaction.followup.send("🗑️ Você cancelou sua inscrição.", ephemeral=True)
-        
 # --- VIEW PARA O MENU PEROXIDE ---
 class PeroxideView(discord.ui.View):
     def __init__(self):
@@ -414,19 +161,7 @@ async def peroxide(interaction: discord.Interaction):
 # =========================
 # EVENTOS DO BOT
 # =========================
-@bot.event
-async def on_member_join(member):
-    # Calcula a idade da conta
-    agora = datetime.now(timezone.utc)
-    idade_conta = agora - member.created_at
 
-    # Se a conta tiver menos de 7 dias (7 dias * 24h * 3600s)
-    if idade_conta.total_seconds() < 604800:
-        try:
-            await member.send("🛡️ **Lᴏsᴛ Sᴏᴜʟs 〔魂〕:** Sua conta é muito recente. Para evitar fakes, só aceitamos contas com mais de 7 dias.")
-            await member.kick(reason="Conta muito nova (possível alt/fake).")
-        except:
-            pass
         
 @bot.event
 async def on_ready():
@@ -437,27 +172,10 @@ async def on_ready():
 async def on_member_join(member):
     try:
         embed = discord.Embed(
-            title=f" Bem-vindo(a) à Lᴏsᴛ Sᴏᴜʟs 〔魂〕, {member.name}!",
-            description="É uma honra ter você conosco! Prepare-se para as batalhas e fortaleça nossa Comunidade.",
+            title=f" Bem-vindo(a) à o Servidor, {member.name}!",
+            description="É uma honra ter você conosco! Sejá bem vindo e fortaleça nossa Comunidade.",
             color=discord.Color.gold()
         )
-        
-        link_grupo = " https://www.roblox.com/pt/communities/795234685/Lost-Sou-s#!/about"
-        link_logo = "https://media.discordapp.net/attachments/1478217477916987496/1479116565822570496/19_Sem_Titulo_20260304183425.png?ex=69aade25&is=69a98ca5&hm=8c577fb81726bd0b1c856f00bacfe5caef3e3e4e326fc6964f7c6b9440a7eef2&=&format=webp&quality=lossless&width=950&height=950"
-        link_dc = "https://discord.gg/VsCbwamCgm"
-        # Instrução do comando /solicitar
-        embed.add_field(
-            name="📝 Como entrar no Grupo", 
-            value="1. Entre no link do grupo abaixo e peça para entrar.\n2. Volte aqui no servidor e digite o comando `/solicitar`.", 
-            inline=False
-        )
-        embed.add_field(name="💾 Discord", value=f"[ENTRAR NA LOST]({link_dc})", inline=False)
-        embed.add_field(name="🛡️ Grupo no Roblox", value=f"[ENTRAR NO GRUPO]({link_grupo})", inline=False)
-        embed.add_field(name="📢 Aviso", value="Certifique-se de estar no grupo para participar dos eventos e ganhar cargos!", inline=False)
-        
-        embed.set_thumbnail(url=member.display_avatar.url)
-        embed.set_image(url=link_logo)
-        embed.set_footer(text="Lᴏsᴛ Sᴏᴜʟs 〔魂〕.")
         
         await member.send(embed=embed)
     except discord.Forbidden:
@@ -471,11 +189,11 @@ async def on_member_join(member):
 
 @bot.tree.command(name="help", description="Mostra a lista completa de comandos e como usá-los")
 async def help_cmd(interaction: discord.Interaction):
-    link_logo = "https://media.discordapp.net/attachments/1478217477916987496/1479116565822570496/19_Sem_Titulo_20260304183425.png"
+    link_logo = "https://cdn.discordapp.com/attachments/1478901345963479131/1501375280508567583/Gemini_Generated_Image_s6lv1ps6lv1ps6lv.png?ex=69fbd831&is=69fa86b1&hm=880567f0b71a7d0bee9c39da567d7d314cf29939df3ff486a18b584fc9495854&"
     
     embed = discord.Embed(
-        title="📚 Central de Ajuda - Lost Bot",
-        description="Gerencie sua jornada na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** com nossos comandos oficiais.",
+        title="📚 Central de Ajuda - AMZ Bot",
+        description="Veja os Comandos da **Society** com nossos comandos oficiais.",
         color=discord.Color.blue()
     )
 
@@ -483,20 +201,9 @@ async def help_cmd(interaction: discord.Interaction):
     embed.add_field(
         name="🛡️ Gestão de Guilda", 
         value=(
-            "`/regras` - Exibe as leis do servidor, jogo e punições.\n"
+          
             "`/peroxide` - Central de links, arenas e guia de trade.\n"
-            "`/logo` - Mostra a identidade visual e link do grupo.\n"
-            "`/ally` - Consulta a logo e link de guildas aliadas."
-        ), 
-        inline=False
-    )
-
-    # --- EVENTOS E PVP ---
-    embed.add_field(
-        name="⚔️ Eventos & PvP", 
-        value=(
-            "`/agendar_guerra` - Painel de inscrição (12 vagas) com sorteio.\n"
-            "`/solicitar` - Solicitar entrada no grupo do Roblox."
+          
         ), 
         inline=False
     )
@@ -519,11 +226,6 @@ async def help_cmd(interaction: discord.Interaction):
         inline=False
     )
 
-    embed.set_thumbnail(url=link_logo)
-    embed.set_footer(
-        text=f"Solicitado por {interaction.user.name} • Lᴏsᴛ Sᴏᴜʟs 〔魂〕", 
-        icon_url=interaction.user.display_avatar.url
-    )
 
     await interaction.response.send_message(embed=embed)
 
@@ -531,52 +233,6 @@ async def help_cmd(interaction: discord.Interaction):
 async def ping(interaction: Interaction):
     await interaction.response.send_message(f"🏓 **Pong!** `{round(bot.latency * 1000)}ms`")
 
-@bot.tree.command(name="logo", description="Mostra a identidade visual e o link da Lᴏsᴛ Sᴏᴜʟs 〔魂〕")
-async def logo(interaction: Interaction):
-    link_grupo = " https://www.roblox.com/pt/communities/795234685/Lost-Sou-s#!/about"
-    link_logo = "https://media.discordapp.net/attachments/1478217477916987496/1479116565822570496/19_Sem_Titulo_20260304183425.png?ex=69aade25&is=69a98ca5&hm=8c577fb81726bd0b1c856f00bacfe5caef3e3e4e326fc6964f7c6b9440a7eef2&=&format=webp&quality=lossless&width=950&height=950"
-    
-    embed = discord.Embed(
-        title="🛡️ Lᴏsᴛ Sᴏᴜʟs 〔魂〕 - Oficial",
-        description="Unidos pela força, guiados pela honra.",
-        color=discord.Color.gold()
-    )
-    embed.add_field(name="🔗 Link do Grupo", value=f"[CLIQUE PARA ENTRAR]({link_grupo})", inline=False)
-    embed.add_field(name="⚔️ Status", value="Recrutamento Aberto", inline=True)
-    embed.add_field(name="📜 Requisito", value="Usar logo se preferir", inline=True)
-    embed.set_image(url=link_logo)
-    embed.set_footer(text=f"Solicitado por {interaction.user.name}", icon_url=interaction.user.display_avatar.url)
-    
-    await interaction.response.send_message(embed=embed)
-
-@bot.tree.command(name="agendar_guerra", description="Inicia uma chamada para guerra com sorteio de times e regras")
-@app_commands.describe(data="Ex: Hoje", horario="Ex: 20:00", imagem="Link da imagem (URL)", limitacoes="Regras de build/nível (Ex: Sem Bankai, Apenas Shikai)")
-async def agendar_guerra(interaction: Interaction, data: str, horario: str, imagem: str, limitacoes: str):
-    embed = discord.Embed(
-        title="⚔️ CONVOCAÇÃO DE GUERRA",
-        description=f"Preparem-se guerreiros! A batalha foi anunciada.\n**Precisa de 12 jogadores para sortear os times.**",
-        color=discord.Color.gold()
-    )
-    
-    # Detalhes do Evento
-    embed.add_field(name="📅 Data", value=data, inline=True)
-    embed.add_field(name="⏰ Horário", value=horario, inline=True)
-    
-    # Campo de Regras e Limitações
-    embed.add_field(name="📜 Regras / Limitações", value=f"```\n{limitacoes}\n```", inline=False)
-    
-    # Aviso de Punição
-    embed.add_field(
-        name="🚨 PUNIÇÃO POR AUSÊNCIA", 
-        value="**Não comparecer no horário marcado = MUTE.**\n**Reincidência = WARN.**\n*Cancele sua inscrição se não puder ir.*", 
-        inline=False
-    )
-
-    embed.set_image(url=imagem)
-    embed.set_footer(text="Lᴏsᴛ Sᴏᴜʟs 〔魂〕 - Sistema Automático de Guerra")
-    
-    view = GuerraView(imagem_url=imagem)
-    await interaction.response.send_message(embed=embed, view=view)
 
 # --- Comandos de Mídia ---
 
@@ -645,272 +301,7 @@ async def gifct(interaction: discord.Interaction, arquivo: discord.Attachment):
             if os.path.exists(p): 
                 os.remove(p)
 
-# =========================
-# COMANDO: ALLY COM CACHE BREAK (FIXED)
-# =========================
-@bot.tree.command(name="ally", description="Exibe a logo atualizada de uma Comunidade aliada")
-@app_commands.describe(nome="Nome da Comunidade aliada", id_grupo="O ID numérico do grupo no Roblox")
-async def ally(interaction: discord.Interaction, nome: str, id_grupo: str):
-    # Defer evita o erro "Unknown Interaction" (404/10062)
-    await interaction.response.defer() 
 
-    link_grupo = f"https://www.roblox.com/communities/{id_grupo}"
-    api_url = f"https://thumbnails.roblox.com/v1/groups/icons?groupIds={id_grupo}&size=420x420&format=Png&isCircular=false"
-    
-    logo_final = None
-    async with aiohttp.ClientSession() as session:
-        async with session.get(api_url) as response:
-            if response.status == 200:
-                data = await response.json()
-                if data['data']:
-                    # ?t= força o Discord a ignorar o cache da imagem antiga
-                    logo_final = f"{data['data'][0]['imageUrl']}?t={int(time.time())}"
-
-    embed = discord.Embed(
-        title=f"🤝 Aliança: {nome}",
-        description=f"**Lᴏsᴛ Sᴏᴜʟs 〔魂〕** caminha junto a **{nome}**.\n\n[Clique aqui para visitar o grupo]({link_grupo})",
-        color=discord.Color.blue()
-    )
-    if logo_final: embed.set_image(url=logo_final)
-    embed.set_footer(text="Lᴏsᴛ Sᴏᴜʟs 〔魂〕 - Diplomacia")
-
-    # Followup é obrigatório após o defer
-    await interaction.followup.send(embed=embed)
-
-@bot.tree.command(name="regras", description="Exibe as leis fundamentais da Lᴏsᴛ Sᴏᴜʟs 〔魂〕 (Servidor e Jogo)")
-async def regras(interaction: discord.Interaction):
-    link_logo = "https://media.discordapp.net/attachments/1478217477916987496/1479116565822570496/19_Sem_Titulo_20260304183425.png?ex=69aade25&is=69a98ca5&hm=8c577fb81726bd0b1c856f00bacfe5caef3e3e4e326fc6964f7c6b9440a7eef2&=&format=webp&quality=lossless&width=950&height=950"
-    
-    # --- EMBED 1: REGRAS DO SERVIDOR ---
-    embed1 = discord.Embed(
-        title="📜 Regras do Servidor - Lᴏsᴛ Sᴏᴜʟs 〔魂〕",
-        description="O descumprimento destas normas resultará em punições imediatas.",
-        color=discord.Color.gold()
-    )
-    embed1.add_field(name="⚖️ Conduta Básica", value="**1.** Respeito mútuo acima de tudo.\n**2.** Proibido qualquer tipo de Discriminação/Racismo/Homofobia.\n**3.** Proibido Spam de mensagens repetitivas.", inline=False)
-    embed1.add_field(name="🚫 Proibições", value="**4.** Conteúdo +18 (Pornografia/Gifs) é proibido.\n**5.** Proibido divulgar outros servidores/canais sem permissão.\n**6.** Proibido vazar informações internas da Comunidade.\n**7.** Proibido mendigar cargo ou promoções.", inline=False)
-    embed1.add_field(name="👥 Outros", value="**8.** Evite intrigas por religião ou política.\n**9.** Idade mínima: 13 anos.", inline=False)
-    embed1.set_thumbnail(url=link_logo)
-
-    # --- EMBED 2: REGRAS DO JOGO  ---
-    embed2 = discord.Embed(
-        title="⚔️ Regras Jogo ",
-        description="Normas de combate e comportamento in-game.",
-        color=discord.Color.dark_red()
-    )
-    embed2.add_field(name="🛡️ Identidade", value="1. É obrigatório o uso da Logo da Guilda.\n2. Proibido lutar contra membros da guilda sem logo.", inline=False)
-    embed2.add_field(name="🚫 Combate e Traição", value="3. Proibido Grips/Mortes não justificadas contra membros ou Allys.\n4. Proibido deixar aliados morrerem na sua presença.\n5. Proibido usar o nome da guilda para causar má reputação. \n6. Proibido tentar Burlar as Regras (Má Fé)", inline=False)
-    embed2.add_field(name="⚠️ Observação", value="A guilda não protege membros que ajudam jogadores sem logo ou de guildas inimigas.", inline=False)
-    # --- EMBED 3: SISTEMA DE WARNS ---
-    embed3 = discord.Embed(
-        title="⚠️ Sistema de Punições (WARNs)",
-        description="A contagem de infrações leva à expulsão definitiva.",
-        color=discord.Color.red()
-    )
-    embed3.add_field(name="Fase Inicial", value="`1-2 WARNs`: Advertência verbal e aviso público.", inline=True)
-    embed3.add_field(name="Fase Grave", value="`3-4 WARNs`: Suspensão de eventos e rebaixamento.", inline=True)
-    embed3.add_field(name="Fase Final", value="`5-6 WARNs`: Última chance e avaliação da liderança.\n`7 WARNs`: **EXPULSÃO IMEDIATA.**", inline=False)
-    embed3.set_footer(text="A liderança reserva o direito de punir atos maliciosos não listados.")
-
-    # Enviando tudo de uma vez
-    await interaction.response.send_message(embeds=[embed1, embed2, embed3])
-
-# ==========================================
-# CONFIGURAÇÕES DE ID (Lᴏsᴛ Sᴏᴜʟs)
-# ==========================================
-ID_CARGO_ACEITO = 1358951916138270784
-ID_CANAL_LOGS = 1479582664590889071
-ID_GRUPO_ROBLOX = "795234685"
-# --- VIEW DE SOLICITAÇÃO (O QUE O ADM VÊ) ---
-class SolicitacaoView(discord.ui.View):
-    def __init__(self, solicitante: discord.Member, nick_roblox: str):
-        super().__init__(timeout=None)
-        self.solicitante = solicitante
-        self.nick_roblox = nick_roblox
-
-    async def finalizar_painel(self, interaction: discord.Interaction, texto_log: str, cor: discord.Color):
-        # Desativa os botões de decisão para evitar cliques duplos
-        for child in self.children:
-            if child.custom_id != "btn_verificar_pratico":
-                child.disabled = True
-        
-        embed_edit = interaction.message.embeds[0]
-        embed_edit.color = cor
-        embed_edit.add_field(name="🛡️ Decisão Final", value=f"{texto_log}\n**Responsável:** {interaction.user.mention}", inline=False)
-        
-        await interaction.response.edit_message(embed=embed_edit, view=self)
-
-    # BOTÃO 1: VERIFICAR (PRATICIDADE PARA O ADM)
-    @discord.ui.button(label="🔍 Verificar Pedido", style=discord.ButtonStyle.grey, custom_id="btn_verificar_pratico")
-    async def verificar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        link_requests = f"https://www.roblox.com/communities/configure?id={ID_GRUPO_ROBLOX}#!/join-requests"
-        link_perfil = f"https://www.roblox.com/users/profile?username={self.nick_roblox}"
-        await interaction.response.send_message(
-            content=f"📑 **Painel de Verificação:**\n**Nick:** `{self.nick_roblox}`\n"
-                    f"**Painel do Grupo:** [Abrir Solicitações]({link_requests})\n"
-                    f"**Perfil:** [Ver no Roblox]({link_perfil})",
-            ephemeral=True
-        )
-
-    # BOTÃO 2: ACEITAR (CARGO AUTO + DM)
-    @discord.ui.button(label="Aceitar", style=discord.ButtonStyle.green, emoji="✅", custom_id="btn_aceitar_final")
-    async def aceitar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        cargo = interaction.guild.get_role(ID_CARGO_ACEITO)
-        status = "✅ **Solicitação Aceita! Cargo entregue.**"
-        
-        try:
-            if cargo: await self.solicitante.add_roles(cargo)
-        except: status = "⚠️ **Aceito, mas erro no cargo (Hierarquia).**"
-
-        await self.finalizar_painel(interaction, status, discord.Color.green())
-        try:
-            await self.solicitante.send(f"🎉 **Parabéns!** Sua entrada na **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi **ACEITA**!")
-        except: pass
-
-    # BOTÃO 3: RECUSAR (DM DE AVIS09O)
-    @discord.ui.button(label="Recusar", style=discord.ButtonStyle.red, emoji="❌", custom_id="btn_recusar_final")
-    async def recusar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.finalizar_painel(interaction, "❌ **Solicitação Recusada.**", discord.Color.red())
-        try:
-            await self.solicitante.send("❌ Sua solicitação para a **Lᴏsᴛ Sᴏᴜʟs 〔魂〕** foi recusada.")
-        except: pass
-
-    # BOTÃO 4: FALTOU PEDIDO (LINK DO GRUPO + INSTRUÇÃO)
-    @discord.ui.button(label="Faltou Pedido", style=discord.ButtonStyle.secondary, emoji="⚠️", custom_id="btn_faltou_final")
-    async def faltou_pedido(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.finalizar_painel(interaction, "⚠️ **Avisado: Não enviou pedido no Roblox.**", discord.Color.orange())
-        try:
-            link_grupo = f"https://www.roblox.com/pt/communities/{ID_GRUPO_ROBLOX}"
-            await self.solicitante.send(f"⚠️ **Olá!** Você ainda não enviou o pedido no grupo do Roblox!\n🔗 {link_grupo}")
-        except: pass
-
-# =========================
-# COMANDO /AVALIACAO
-# =========================
-@bot.tree.command(name="avaliacao", description="Solicita um teste de PvP")
-async def avaliacao(interaction: discord.Interaction):
-    # Defer com ephemeral=True para que apenas o jogador veja a confirmação
-    await interaction.response.defer(ephemeral=True)
-
-    # Lista de IDs dos seus avaliadores
-    avaliadores_ids = [1389503739018219571,1046194613066678333,1017444684022427738]
-    
-    embed_aviso = discord.Embed(
-        title="⚔️ Solicitação de Avaliação",
-        description=f"O membro {interaction.user.mention} (`{interaction.user.name}`) deseja um teste de PvP.",
-        color=discord.Color.gold()
-    )
-    embed_aviso.set_thumbnail(url=interaction.user.display_avatar.url)
-    embed_aviso.set_footer(text="Clique no botão abaixo para agendar a arena ou definir o Rank.")
-
-    sucesso = False
-    for aval_id in avaliadores_ids:
-        try:
-            # Usamos fetch_user para garantir que o bot encontre o avaliador mesmo fora do cache
-            avaliador = await bot.fetch_user(aval_id)
-            if avaliador:
-                # Criamos a View passando o ID do candidato
-                view = AvaliacaoView(candidato_id=interaction.user.id)
-                await avaliador.send(embed=embed_aviso, view=view)
-                sucesso = True
-                # Pequena pausa para não ser bloqueado pelo Discord (Rate Limit)
-                await asyncio.sleep(0.3) 
-        except Exception as e:
-            print(f"Erro ao enviar para {aval_id}: {e}")
-            continue
-
-    if sucesso:
-        await interaction.followup.send("✅ Sua solicitação foi enviada aos Avaliadores! Aguarde o retorno na sua DM.", ephemeral=True)
-    else:
-        await interaction.followup.send("❌ Não foi possível avisar os avaliadores. Verifique se as DMs deles estão abertas.", ephemeral=True)
-
-#motor do limpeza
-@bot.event
-async def on_ready():
-    # Inicia a tarefa de limpeza apenas quando o bot estiver pronto
-    if not limpeza_multi_canais.is_running():
-        limpeza_multi_canais.start()
-        
-    print(f"✅ Bot logado como {bot.user}")
-    print("🚀 Sistema de limpeza de 2 dias ativado!")
-
-# --- COMANDO /SOLICITAR (VISUAL DAS IMAGENS) ---
-STAFF_1 = 1389503739018219571 
-STAFF_2 = 1046194613066678333
-STAFF_3 = 1017444684022427738
-
-@bot.tree.command(name="solicitar", description="Pede aprovação na guilda e grupo")
-async def solicitar(interaction: discord.Interaction, nick_roblox: str):
-    # 1. RESPONDE AO USUÁRIO PRIMEIRO PARA EVITAR O ERRO
-    await interaction.response.send_message("✅ **Solicitação enviada com sucesso! Aguarde a avaliação da Staff.**", ephemeral=True)
-
-    canal_logs = bot.get_channel(ID_CANAL_LOGS)
-    if not canal_logs: 
-        return print("❌ Erro: Canal de logs não encontrado.")
-    
-    pings = f"<@{STAFF_1}> <@{STAFF_2}> <@{STAFF_3}>"
-    
-    embed = discord.Embed(
-        title="🛡️ Nova Solicitação de Entrada",
-        description=f"O membro {interaction.user.mention} quer entrar na guilda.",
-        color=discord.Color.blue()
-    )
-    embed.add_field(name="👤 Nick no Roblox", value=f"`{nick_roblox}`", inline=True)
-    embed.add_field(name="🔗 Perfil", value=f"[Abrir Perfil](https://www.roblox.com/users/profile?username={nick_roblox})", inline=True)
-    embed.add_field(name="🛡️ Grupo", value=f"[Verificar Pedidos](https://www.roblox.com/communities/configure?id={ID_GRUPO_ROBLOX}#!/join-requests)", inline=False)
-    
-    embed.set_thumbnail(url=interaction.user.display_avatar.url) 
-    embed.set_footer(text="Lᴏsᴛ Sᴏᴜʟs 〔魂〕 - Sistema de Recrutamento")
-
-    view = SolicitacaoView(solicitante=interaction.user, nick_roblox=nick_roblox)
-    
-    # 2. DEIXA APENAS ESTE ENVIO PARA O CANAL DE LOGS (Com os pings)
-    await canal_logs.send(content=f"🔔 **Nova solicitação pendente!**\n{pings}", embed=embed, view=view)
-
-# --- COMANDO /LIMPAR ---
-@bot.tree.command(name="limpar", description="Apaga mensagens do canal")
-async def limpar(interaction: discord.Interaction, quantidade: int = 100):
-    if not interaction.user.guild_permissions.manage_messages:
-        return await interaction.response.send_message("❌ Sem permissão.", ephemeral=True)
-    await interaction.response.defer(ephemeral=True)
-    deleted = await interaction.channel.purge(limit=quantidade, check=lambda m: not m.pinned)
-    await interaction.followup.send(f"🧹 **{len(deleted)}** mensagens removidas.", ephemeral=True)
-# =========================
-# CONFIGURAÇÃO DE LIMPEZA
-# =========================
-# Coloque aqui todos os IDs dos canais que você quer limpar (separados por vírgula)
-CANAIS_PARA_LIMPAR = [
-    1478852029073063936, # Ex: Canal de Solicitações
-    1478851893319962794, # Ex: Canal de Logs
-    1478901434425806941,
-    1478901345963479131  
-]
-@tasks.loop(hours=1) # O bot verifica a cada 1 hora
-async def limpeza_multi_canais():
-    tempo_limite = datetime.now(timezone.utc) - timedelta(days=2)
-    
-    for canal_id in CANAIS_PARA_LIMPAR:
-        canal = bot.get_channel(canal_id)
-        
-        if canal:
-            try:
-                # Limpa mensagens com mais de 2 dias, ignorando as fixadas
-                deleted = await canal.purge(before=tempo_limite, check=lambda m: not m.pinned)
-                if len(deleted) > 0:
-                    print(f"🧹 [LIMPEZA] {len(deleted)} mensagens removidas do canal: {canal.name}")
-            except Exception as e:
-                print(f"❌ Erro ao limpar canal {canal_id}: {e}")
-        else:
-            print(f"⚠️ Canal {canal_id} não encontrado ou o bot não tem acesso.")
-
-# Garante que o bot está pronto antes de começar a limpar
-@limpeza_multi_canais.before_loop
-async def before_limpeza():
-    await bot.wait_until_ready()
-
-
-# COMANDOS ADMINISTRATIVOS
-# =========================
 
 @bot.command()
 @commands.has_permissions(administrator=True)
