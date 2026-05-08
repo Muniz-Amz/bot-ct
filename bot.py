@@ -19,7 +19,7 @@ MONGO_URL = os.getenv("MONGO_URL") # Certifique-se que esta variável está no s
 
 # Conexão com MongoDB
 cluster = pymongo.MongoClient(MONGO_URL)
-db = cluster["amz_database"]
+db = cluster["amz_studios_db"]
 collection_limpeza = db["config_limpeza"]
 servidores_col = db["servidores_ativos"] # Coleção para gerenciar servidores ativos
 
@@ -68,11 +68,17 @@ def home():
 @app.route('/api/bot-servidores', methods=['GET'])
 def buscar_servidores_ativos():
     try:
-        servidores = servidores_col.find({}, {"guild_id": 1, "_id": 0})
-        lista_ids = [s['guild_id'] for s in servidores]
-        return jsonify(lista_ids), 200
+        # Certifique-se que servidores_col está usando o banco 'amz_studios_db'
+        # Busca guild_id e nome de todos os servidores na coleção
+        servidores = servidores_col.find({}, {"guild_id": 1, "nome": 1, "_id": 0})
+        lista_servidores = list(servidores)
+        
+        # Retorna a lista de objetos (ID e Nome)
+        return jsonify(lista_servidores), 200
     except Exception as e:
-        return jsonify({"erro": str(e)}), 500
+        print(f"❌ Erro na API do Bot: {e}")
+        # Retorna uma lista vazia em vez de erro 500 para não quebrar o site
+        return jsonify([]), 200
 
 @app.route('/api/configurar-limpeza', methods=['POST'])
 def configurar_limpeza_api():
